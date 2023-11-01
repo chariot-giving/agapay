@@ -1,0 +1,1615 @@
+openapi: 3.0.0
+info:
+  contact:
+    email: developers@givechariot.com
+    name: Chariot Development Team
+    url: https://www.givechariot.com/contact
+  description: The Chariot Payments REST API.
+  termsOfService: https://www.givechariot.com/legal-nonprofit
+  title: Chariot Payments API
+  version: v1
+servers:
+- description: Staging
+  url: https://devapi.givechariot.com
+- description: Sandbox
+  url: https://sandboxapi.givechariot.com
+- description: Production
+  url: https://api.givechariot.com
+security:
+- bearerAuth: []
+paths:
+  /accounts:
+    post:
+      description: |
+        Create a bank account with Chariot.
+        This endpoint is used to create a bank account for a payer in the Chariot Giving Payment Network.
+        The account is setup in the "For-Benefit-Of" (FBO) model where the account is owned and maintained by Chariot.
+        An account is necessary in order to make and send payments to nonprofits.
+      operationId: createAccount
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Account'
+        description: The account to create
+        required: true
+      responses:
+        "201":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Account'
+          description: The account was created
+          headers:
+            Location:
+              $ref: '#/components/headers/Location'
+        "400":
+          content:
+            application/json:
+              example:
+                timestamp: 2020-07-10 15:00:00.000
+                code: 400
+                error: Bad Request
+                message: Expected an API key to be provided in the header `x-chariot-api-key`
+              schema:
+                $ref: '#/components/schemas/ApiError'
+          description: The request is invalid or contains invalid parameters
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/X-Request-Id'
+        "401":
+          content:
+            application/json:
+              example:
+                timestamp: 2020-07-10 15:00:00.000
+                code: 401
+                error: Unauthorized
+                message: Unauthorized
+              schema:
+                $ref: '#/components/schemas/ApiError'
+          description: Unauthorized. The request is missing the security (OAuth2 Bearer
+            token) requirements and the server is unable to verify the identify of
+            the caller.
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/X-Request-Id'
+        "403":
+          content:
+            application/json:
+              example:
+                timestamp: 2020-07-10 15:00:00.000
+                code: 403
+                error: Forbidden
+                message: User is not allowed to access this resource
+              schema:
+                $ref: '#/components/schemas/ApiError'
+          description: Access denied
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/X-Request-Id'
+        "409":
+          content:
+            application/json:
+              example:
+                timestamp: 2020-07-10 15:00:00.000
+                code: 409
+                error: Conflict
+                message: Request conflicts with an already existing resource
+              schema:
+                $ref: '#/components/schemas/ApiError'
+          description: Resource Conflicts
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/X-Request-Id'
+      summary: Create an account
+      tags:
+      - accounts
+  /accounts/{id}:
+    get:
+      description: |
+        Get an account by its unique identifier.
+        This endpoint is used to retrieve an account by its unique identifier.
+      operationId: getAccount
+      parameters:
+      - description: The unique identifier for the account
+        explode: false
+        in: path
+        name: id
+        required: true
+        schema:
+          type: string
+        style: simple
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Account'
+          description: The account was retrieved
+        "400":
+          content:
+            application/json:
+              example:
+                timestamp: 2020-07-10 15:00:00.000
+                code: 400
+                error: Bad Request
+                message: Expected an API key to be provided in the header `x-chariot-api-key`
+              schema:
+                $ref: '#/components/schemas/ApiError'
+          description: The request is invalid or contains invalid parameters
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/X-Request-Id'
+        "401":
+          content:
+            application/json:
+              example:
+                timestamp: 2020-07-10 15:00:00.000
+                code: 401
+                error: Unauthorized
+                message: Unauthorized
+              schema:
+                $ref: '#/components/schemas/ApiError'
+          description: Unauthorized. The request is missing the security (OAuth2 Bearer
+            token) requirements and the server is unable to verify the identify of
+            the caller.
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/X-Request-Id'
+        "403":
+          content:
+            application/json:
+              example:
+                timestamp: 2020-07-10 15:00:00.000
+                code: 403
+                error: Forbidden
+                message: User is not allowed to access this resource
+              schema:
+                $ref: '#/components/schemas/ApiError'
+          description: Access denied
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/X-Request-Id'
+        "404":
+          content:
+            application/json:
+              example:
+                timestamp: 2020-07-10 15:00:00.000
+                code: 404
+                error: Not Found
+                message: Resource is not found
+              schema:
+                $ref: '#/components/schemas/ApiError'
+          description: Resource Not Found
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/X-Request-Id'
+        "409":
+          content:
+            application/json:
+              example:
+                timestamp: 2020-07-10 15:00:00.000
+                code: 409
+                error: Conflict
+                message: Request conflicts with an already existing resource
+              schema:
+                $ref: '#/components/schemas/ApiError'
+          description: Resource Conflicts
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/X-Request-Id'
+      summary: Retrieve an account
+      tags:
+      - accounts
+  /accounts/{id}/balances:
+    get:
+      description: |
+        Get the balances for an account.
+        This endpoint is used to retrieve the balances for a single account.
+      operationId: getAccountBalances
+      parameters:
+      - description: The unique identifier for the account
+        explode: false
+        in: path
+        name: id
+        required: true
+        schema:
+          type: string
+        style: simple
+      - description: "The date and time to retrieve balances for. If not set, returns\
+          \ the current balances."
+        explode: true
+        in: query
+        name: timestamp
+        required: false
+        schema:
+          format: date-time
+          type: string
+        style: form
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccountBalance'
+          description: The balances were retrieved
+        "400":
+          content:
+            application/json:
+              example:
+                timestamp: 2020-07-10 15:00:00.000
+                code: 400
+                error: Bad Request
+                message: Expected an API key to be provided in the header `x-chariot-api-key`
+              schema:
+                $ref: '#/components/schemas/ApiError'
+          description: The request is invalid or contains invalid parameters
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/X-Request-Id'
+        "401":
+          content:
+            application/json:
+              example:
+                timestamp: 2020-07-10 15:00:00.000
+                code: 401
+                error: Unauthorized
+                message: Unauthorized
+              schema:
+                $ref: '#/components/schemas/ApiError'
+          description: Unauthorized. The request is missing the security (OAuth2 Bearer
+            token) requirements and the server is unable to verify the identify of
+            the caller.
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/X-Request-Id'
+        "403":
+          content:
+            application/json:
+              example:
+                timestamp: 2020-07-10 15:00:00.000
+                code: 403
+                error: Forbidden
+                message: User is not allowed to access this resource
+              schema:
+                $ref: '#/components/schemas/ApiError'
+          description: Access denied
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/X-Request-Id'
+        "404":
+          content:
+            application/json:
+              example:
+                timestamp: 2020-07-10 15:00:00.000
+                code: 404
+                error: Not Found
+                message: Resource is not found
+              schema:
+                $ref: '#/components/schemas/ApiError'
+          description: Resource Not Found
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/X-Request-Id'
+        "409":
+          content:
+            application/json:
+              example:
+                timestamp: 2020-07-10 15:00:00.000
+                code: 409
+                error: Conflict
+                message: Request conflicts with an already existing resource
+              schema:
+                $ref: '#/components/schemas/ApiError'
+          description: Resource Conflicts
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/X-Request-Id'
+      summary: Retrieve account balances
+      tags:
+      - balances
+  /transfers:
+    get:
+      description: |
+        List transfers.
+        This endpoint is used to list transfers.
+      operationId: listTransfers
+      parameters:
+      - description: The unique identifier for the account
+        explode: true
+        in: query
+        name: account_id
+        required: true
+        schema:
+          type: string
+        style: form
+      - description: Limit the size of the list that is returned. The default (and
+          maximum) is 100 objects.
+        explode: true
+        in: query
+        name: limit
+        required: false
+        schema:
+          format: int32
+          type: integer
+        style: form
+      - description: "The cursor to use for pagination. If not set, the first page\
+          \ of results will be returned."
+        explode: true
+        in: query
+        name: cursor
+        required: false
+        schema:
+          type: string
+        style: form
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TransferList'
+          description: The transfers were retrieved
+        "400":
+          content:
+            application/json:
+              example:
+                timestamp: 2020-07-10 15:00:00.000
+                code: 400
+                error: Bad Request
+                message: Expected an API key to be provided in the header `x-chariot-api-key`
+              schema:
+                $ref: '#/components/schemas/ApiError'
+          description: The request is invalid or contains invalid parameters
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/X-Request-Id'
+        "401":
+          content:
+            application/json:
+              example:
+                timestamp: 2020-07-10 15:00:00.000
+                code: 401
+                error: Unauthorized
+                message: Unauthorized
+              schema:
+                $ref: '#/components/schemas/ApiError'
+          description: Unauthorized. The request is missing the security (OAuth2 Bearer
+            token) requirements and the server is unable to verify the identify of
+            the caller.
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/X-Request-Id'
+        "403":
+          content:
+            application/json:
+              example:
+                timestamp: 2020-07-10 15:00:00.000
+                code: 403
+                error: Forbidden
+                message: User is not allowed to access this resource
+              schema:
+                $ref: '#/components/schemas/ApiError'
+          description: Access denied
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/X-Request-Id'
+        "409":
+          content:
+            application/json:
+              example:
+                timestamp: 2020-07-10 15:00:00.000
+                code: 409
+                error: Conflict
+                message: Request conflicts with an already existing resource
+              schema:
+                $ref: '#/components/schemas/ApiError'
+          description: Resource Conflicts
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/X-Request-Id'
+      summary: List transfers
+      tags:
+      - transfers
+    post:
+      description: |
+        Transfer funds between accounts.
+        This endpoint is used to move money into and out of the Chariot account from an external bank account.
+      operationId: transferFunds
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Transfer'
+        description: The transfer to create
+        required: true
+      responses:
+        "201":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Transfer'
+          description: The transfer was created
+          headers:
+            Location:
+              $ref: '#/components/headers/Location'
+        "400":
+          content:
+            application/json:
+              example:
+                timestamp: 2020-07-10 15:00:00.000
+                code: 400
+                error: Bad Request
+                message: Expected an API key to be provided in the header `x-chariot-api-key`
+              schema:
+                $ref: '#/components/schemas/ApiError'
+          description: The request is invalid or contains invalid parameters
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/X-Request-Id'
+        "401":
+          content:
+            application/json:
+              example:
+                timestamp: 2020-07-10 15:00:00.000
+                code: 401
+                error: Unauthorized
+                message: Unauthorized
+              schema:
+                $ref: '#/components/schemas/ApiError'
+          description: Unauthorized. The request is missing the security (OAuth2 Bearer
+            token) requirements and the server is unable to verify the identify of
+            the caller.
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/X-Request-Id'
+        "403":
+          content:
+            application/json:
+              example:
+                timestamp: 2020-07-10 15:00:00.000
+                code: 403
+                error: Forbidden
+                message: User is not allowed to access this resource
+              schema:
+                $ref: '#/components/schemas/ApiError'
+          description: Access denied
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/X-Request-Id'
+        "409":
+          content:
+            application/json:
+              example:
+                timestamp: 2020-07-10 15:00:00.000
+                code: 409
+                error: Conflict
+                message: Request conflicts with an already existing resource
+              schema:
+                $ref: '#/components/schemas/ApiError'
+          description: Resource Conflicts
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/X-Request-Id'
+      summary: Transfer funds
+      tags:
+      - transfers
+  /transfers/{id}:
+    get:
+      description: |
+        Get a transfer by its unique identifier.
+        This endpoint is used to retrieve a transfer by its unique identifier.
+      operationId: getTransfer
+      parameters:
+      - description: The unique identifier for the transfer
+        explode: false
+        in: path
+        name: id
+        required: true
+        schema:
+          type: string
+        style: simple
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Transfer'
+          description: The transfer was retrieved
+        "400":
+          content:
+            application/json:
+              example:
+                timestamp: 2020-07-10 15:00:00.000
+                code: 400
+                error: Bad Request
+                message: Expected an API key to be provided in the header `x-chariot-api-key`
+              schema:
+                $ref: '#/components/schemas/ApiError'
+          description: The request is invalid or contains invalid parameters
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/X-Request-Id'
+        "401":
+          content:
+            application/json:
+              example:
+                timestamp: 2020-07-10 15:00:00.000
+                code: 401
+                error: Unauthorized
+                message: Unauthorized
+              schema:
+                $ref: '#/components/schemas/ApiError'
+          description: Unauthorized. The request is missing the security (OAuth2 Bearer
+            token) requirements and the server is unable to verify the identify of
+            the caller.
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/X-Request-Id'
+        "403":
+          content:
+            application/json:
+              example:
+                timestamp: 2020-07-10 15:00:00.000
+                code: 403
+                error: Forbidden
+                message: User is not allowed to access this resource
+              schema:
+                $ref: '#/components/schemas/ApiError'
+          description: Access denied
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/X-Request-Id'
+        "404":
+          content:
+            application/json:
+              example:
+                timestamp: 2020-07-10 15:00:00.000
+                code: 404
+                error: Not Found
+                message: Resource is not found
+              schema:
+                $ref: '#/components/schemas/ApiError'
+          description: Resource Not Found
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/X-Request-Id'
+        "409":
+          content:
+            application/json:
+              example:
+                timestamp: 2020-07-10 15:00:00.000
+                code: 409
+                error: Conflict
+                message: Request conflicts with an already existing resource
+              schema:
+                $ref: '#/components/schemas/ApiError'
+          description: Resource Conflicts
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/X-Request-Id'
+      summary: Retrieve a transfer
+      tags:
+      - transfers
+  /payments:
+    get:
+      description: |
+        List payments.
+        This endpoint is used to list payments.
+      operationId: listPayments
+      parameters:
+      - description: The unique identifier for the account
+        explode: true
+        in: query
+        name: account_id
+        required: true
+        schema:
+          type: string
+        style: form
+      - description: The unique identifier for the recipient
+        explode: true
+        in: query
+        name: recipient_id
+        required: false
+        schema:
+          type: string
+        style: form
+      - description: Limit the size of the list that is returned. The default (and
+          maximum) is 100 objects.
+        explode: true
+        in: query
+        name: limit
+        required: false
+        schema:
+          format: int32
+          type: integer
+        style: form
+      - description: "The cursor to use for pagination. If not set, the first page\
+          \ of results will be returned."
+        explode: true
+        in: query
+        name: cursor
+        required: false
+        schema:
+          type: string
+        style: form
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentList'
+          description: The payments were retrieved
+        "400":
+          content:
+            application/json:
+              example:
+                timestamp: 2020-07-10 15:00:00.000
+                code: 400
+                error: Bad Request
+                message: Expected an API key to be provided in the header `x-chariot-api-key`
+              schema:
+                $ref: '#/components/schemas/ApiError'
+          description: The request is invalid or contains invalid parameters
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/X-Request-Id'
+        "401":
+          content:
+            application/json:
+              example:
+                timestamp: 2020-07-10 15:00:00.000
+                code: 401
+                error: Unauthorized
+                message: Unauthorized
+              schema:
+                $ref: '#/components/schemas/ApiError'
+          description: Unauthorized. The request is missing the security (OAuth2 Bearer
+            token) requirements and the server is unable to verify the identify of
+            the caller.
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/X-Request-Id'
+        "403":
+          content:
+            application/json:
+              example:
+                timestamp: 2020-07-10 15:00:00.000
+                code: 403
+                error: Forbidden
+                message: User is not allowed to access this resource
+              schema:
+                $ref: '#/components/schemas/ApiError'
+          description: Access denied
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/X-Request-Id'
+        "409":
+          content:
+            application/json:
+              example:
+                timestamp: 2020-07-10 15:00:00.000
+                code: 409
+                error: Conflict
+                message: Request conflicts with an already existing resource
+              schema:
+                $ref: '#/components/schemas/ApiError'
+          description: Resource Conflicts
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/X-Request-Id'
+      summary: List payments
+      tags:
+      - payments
+    post:
+      description: |
+        Create a payment.
+        This endpoint is used to send money to a nonprofit recipient.
+      operationId: createPayment
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Payment'
+        description: The payment to create
+        required: true
+      responses:
+        "201":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Payment'
+          description: The payment was created
+          headers:
+            Location:
+              $ref: '#/components/headers/Location'
+        "400":
+          content:
+            application/json:
+              example:
+                timestamp: 2020-07-10 15:00:00.000
+                code: 400
+                error: Bad Request
+                message: Expected an API key to be provided in the header `x-chariot-api-key`
+              schema:
+                $ref: '#/components/schemas/ApiError'
+          description: The request is invalid or contains invalid parameters
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/X-Request-Id'
+        "401":
+          content:
+            application/json:
+              example:
+                timestamp: 2020-07-10 15:00:00.000
+                code: 401
+                error: Unauthorized
+                message: Unauthorized
+              schema:
+                $ref: '#/components/schemas/ApiError'
+          description: Unauthorized. The request is missing the security (OAuth2 Bearer
+            token) requirements and the server is unable to verify the identify of
+            the caller.
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/X-Request-Id'
+        "403":
+          content:
+            application/json:
+              example:
+                timestamp: 2020-07-10 15:00:00.000
+                code: 403
+                error: Forbidden
+                message: User is not allowed to access this resource
+              schema:
+                $ref: '#/components/schemas/ApiError'
+          description: Access denied
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/X-Request-Id'
+        "409":
+          content:
+            application/json:
+              example:
+                timestamp: 2020-07-10 15:00:00.000
+                code: 409
+                error: Conflict
+                message: Request conflicts with an already existing resource
+              schema:
+                $ref: '#/components/schemas/ApiError'
+          description: Resource Conflicts
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/X-Request-Id'
+      summary: Create a payment
+      tags:
+      - payments
+  /payments/{id}:
+    get:
+      description: |
+        Get a payment by its unique identifier.
+        This endpoint is used to retrieve a payment by its unique identifier.
+      operationId: getPayment
+      parameters:
+      - description: The unique identifier for the payment
+        explode: false
+        in: path
+        name: id
+        required: true
+        schema:
+          type: string
+        style: simple
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Payment'
+          description: The payment was retrieved
+        "400":
+          content:
+            application/json:
+              example:
+                timestamp: 2020-07-10 15:00:00.000
+                code: 400
+                error: Bad Request
+                message: Expected an API key to be provided in the header `x-chariot-api-key`
+              schema:
+                $ref: '#/components/schemas/ApiError'
+          description: The request is invalid or contains invalid parameters
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/X-Request-Id'
+        "401":
+          content:
+            application/json:
+              example:
+                timestamp: 2020-07-10 15:00:00.000
+                code: 401
+                error: Unauthorized
+                message: Unauthorized
+              schema:
+                $ref: '#/components/schemas/ApiError'
+          description: Unauthorized. The request is missing the security (OAuth2 Bearer
+            token) requirements and the server is unable to verify the identify of
+            the caller.
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/X-Request-Id'
+        "403":
+          content:
+            application/json:
+              example:
+                timestamp: 2020-07-10 15:00:00.000
+                code: 403
+                error: Forbidden
+                message: User is not allowed to access this resource
+              schema:
+                $ref: '#/components/schemas/ApiError'
+          description: Access denied
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/X-Request-Id'
+        "404":
+          content:
+            application/json:
+              example:
+                timestamp: 2020-07-10 15:00:00.000
+                code: 404
+                error: Not Found
+                message: Resource is not found
+              schema:
+                $ref: '#/components/schemas/ApiError'
+          description: Resource Not Found
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/X-Request-Id'
+        "409":
+          content:
+            application/json:
+              example:
+                timestamp: 2020-07-10 15:00:00.000
+                code: 409
+                error: Conflict
+                message: Request conflicts with an already existing resource
+              schema:
+                $ref: '#/components/schemas/ApiError'
+          description: Resource Conflicts
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/X-Request-Id'
+      summary: Retrieve a payment
+      tags:
+      - payments
+  /recipients:
+    get:
+      description: |
+        List recipients.
+        This endpoint is used to list recipients.
+      operationId: listRecipients
+      parameters:
+      - description: The Employer Identification Number (EIN) for the recipient.
+        explode: true
+        in: query
+        name: ein
+        required: false
+        schema:
+          type: string
+        style: form
+      - description: Limit the size of the list that is returned. The default (and
+          maximum) is 100 objects.
+        explode: true
+        in: query
+        name: limit
+        required: false
+        schema:
+          format: int32
+          type: integer
+        style: form
+      - description: "The cursor to use for pagination. If not set, the first page\
+          \ of results will be returned."
+        explode: true
+        in: query
+        name: cursor
+        required: false
+        schema:
+          type: string
+        style: form
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecipientList'
+          description: The recipients were retrieved
+        "400":
+          content:
+            application/json:
+              example:
+                timestamp: 2020-07-10 15:00:00.000
+                code: 400
+                error: Bad Request
+                message: Expected an API key to be provided in the header `x-chariot-api-key`
+              schema:
+                $ref: '#/components/schemas/ApiError'
+          description: The request is invalid or contains invalid parameters
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/X-Request-Id'
+        "401":
+          content:
+            application/json:
+              example:
+                timestamp: 2020-07-10 15:00:00.000
+                code: 401
+                error: Unauthorized
+                message: Unauthorized
+              schema:
+                $ref: '#/components/schemas/ApiError'
+          description: Unauthorized. The request is missing the security (OAuth2 Bearer
+            token) requirements and the server is unable to verify the identify of
+            the caller.
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/X-Request-Id'
+        "403":
+          content:
+            application/json:
+              example:
+                timestamp: 2020-07-10 15:00:00.000
+                code: 403
+                error: Forbidden
+                message: User is not allowed to access this resource
+              schema:
+                $ref: '#/components/schemas/ApiError'
+          description: Access denied
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/X-Request-Id'
+      summary: List recipients
+      tags:
+      - recipients
+  /recipients/{id}:
+    get:
+      description: |
+        Get a recipient by its unique identifier.
+        This endpoint is used to retrieve a recipient by its unique identifier.
+      operationId: getRecipient
+      parameters:
+      - description: The unique identifier for the recipient
+        explode: false
+        in: path
+        name: id
+        required: true
+        schema:
+          type: string
+        style: simple
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Recipient'
+          description: The recipient was retrieved
+        "400":
+          content:
+            application/json:
+              example:
+                timestamp: 2020-07-10 15:00:00.000
+                code: 400
+                error: Bad Request
+                message: Expected an API key to be provided in the header `x-chariot-api-key`
+              schema:
+                $ref: '#/components/schemas/ApiError'
+          description: The request is invalid or contains invalid parameters
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/X-Request-Id'
+        "401":
+          content:
+            application/json:
+              example:
+                timestamp: 2020-07-10 15:00:00.000
+                code: 401
+                error: Unauthorized
+                message: Unauthorized
+              schema:
+                $ref: '#/components/schemas/ApiError'
+          description: Unauthorized. The request is missing the security (OAuth2 Bearer
+            token) requirements and the server is unable to verify the identify of
+            the caller.
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/X-Request-Id'
+        "403":
+          content:
+            application/json:
+              example:
+                timestamp: 2020-07-10 15:00:00.000
+                code: 403
+                error: Forbidden
+                message: User is not allowed to access this resource
+              schema:
+                $ref: '#/components/schemas/ApiError'
+          description: Access denied
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/X-Request-Id'
+        "404":
+          content:
+            application/json:
+              example:
+                timestamp: 2020-07-10 15:00:00.000
+                code: 404
+                error: Not Found
+                message: Resource is not found
+              schema:
+                $ref: '#/components/schemas/ApiError'
+          description: Resource Not Found
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/X-Request-Id'
+        "409":
+          content:
+            application/json:
+              example:
+                timestamp: 2020-07-10 15:00:00.000
+                code: 409
+                error: Conflict
+                message: Request conflicts with an already existing resource
+              schema:
+                $ref: '#/components/schemas/ApiError'
+          description: Resource Conflicts
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/X-Request-Id'
+      summary: Retrieve a recipient
+      tags:
+      - recipients
+components:
+  headers:
+    X-Request-Id:
+      description: The unique identifier for the request
+      explode: false
+      schema:
+        type: string
+      style: simple
+    Idempotency-Key:
+      description: |
+        The unique identifier for the request.
+        This header is used to ensure idempotency for requests that may be retried.
+      explode: false
+      schema:
+        type: string
+      style: simple
+    Location:
+      description: The URI reference of the created object.
+      explode: false
+      schema:
+        format: uri
+        type: string
+      style: simple
+  responses:
+    BadRequestError:
+      content:
+        application/json:
+          example:
+            timestamp: 2020-07-10 15:00:00.000
+            code: 400
+            error: Bad Request
+            message: Expected an API key to be provided in the header `x-chariot-api-key`
+          schema:
+            $ref: '#/components/schemas/ApiError'
+      description: The request is invalid or contains invalid parameters
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/X-Request-Id'
+    AuthenticationError:
+      content:
+        application/json:
+          example:
+            timestamp: 2020-07-10 15:00:00.000
+            code: 401
+            error: Unauthorized
+            message: Unauthorized
+          schema:
+            $ref: '#/components/schemas/ApiError'
+      description: Unauthorized. The request is missing the security (OAuth2 Bearer
+        token) requirements and the server is unable to verify the identify of the
+        caller.
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/X-Request-Id'
+    ForbiddenError:
+      content:
+        application/json:
+          example:
+            timestamp: 2020-07-10 15:00:00.000
+            code: 403
+            error: Forbidden
+            message: User is not allowed to access this resource
+          schema:
+            $ref: '#/components/schemas/ApiError'
+      description: Access denied
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/X-Request-Id'
+    NotFoundError:
+      content:
+        application/json:
+          example:
+            timestamp: 2020-07-10 15:00:00.000
+            code: 404
+            error: Not Found
+            message: Resource is not found
+          schema:
+            $ref: '#/components/schemas/ApiError'
+      description: Resource Not Found
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/X-Request-Id'
+    ConflictError:
+      content:
+        application/json:
+          example:
+            timestamp: 2020-07-10 15:00:00.000
+            code: 409
+            error: Conflict
+            message: Request conflicts with an already existing resource
+          schema:
+            $ref: '#/components/schemas/ApiError'
+      description: Resource Conflicts
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/X-Request-Id'
+    GoneError:
+      content:
+        application/json:
+          example:
+            timestamp: 2020-07-10 15:00:00.000
+            code: 410
+            error: Gone
+            message: The resource has expired
+          schema:
+            $ref: '#/components/schemas/ApiError'
+      description: Resource Gone or Expired
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/X-Request-Id'
+    InternalServerError:
+      content:
+        application/json:
+          example:
+            timestamp: 2020-07-10 15:00:00.000
+            code: 500
+            error: Internal server error
+            message: The server encountered an error processing your request
+          schema:
+            $ref: '#/components/schemas/ApiError'
+      description: Internal Server Error
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/X-Request-Id'
+  schemas:
+    Account:
+      example:
+        account_number: "1234567890"
+        name: Payer FBO Account
+        created_at: 2000-01-23T04:56:07.000+00:00
+        id: "1234567890"
+        routing_number: "123456789"
+        status: open
+      properties:
+        id:
+          description: The unique identifier for the account
+          example: "1234567890"
+          readOnly: true
+          type: string
+        name:
+          description: The name of the account
+          example: Payer FBO Account
+          type: string
+        account_number:
+          description: The account number
+          example: "1234567890"
+          readOnly: true
+          type: string
+        routing_number:
+          description: The American Bankers' Association (ABA) Routing Transit Number
+            (RTN).
+          example: "123456789"
+          readOnly: true
+          type: string
+        status:
+          description: The status of the account
+          enum:
+          - open
+          - closed
+          example: open
+          readOnly: true
+          type: string
+        created_at:
+          description: The date and time the account was created
+          format: date-time
+          readOnly: true
+          type: string
+      type: object
+    AccountBalance:
+      description: The balance of an account
+      example:
+        account_id: "1234567890"
+        current_balance: 10000
+        available_balance: 10000
+      properties:
+        account_id:
+          description: The unique identifier for the account
+          example: "1234567890"
+          readOnly: true
+          type: string
+        current_balance:
+          description: "The Account's current balance, representing the sum of all\
+            \ posted Transactions on the Account."
+          example: 10000
+          format: int64
+          readOnly: true
+          type: integer
+        available_balance:
+          description: "The Account's available balance, representing the current\
+            \ balance less any open Pending Transactions on the Account."
+          example: 10000
+          format: int64
+          readOnly: true
+          type: integer
+      type: object
+    Transfer:
+      description: A transfer moves funds between accounts using ACH.
+      example:
+        transaction_id: transaction_uyrp7fld2ium70oa7oi
+        account_number: "1234567890"
+        amount: 10000
+        funding: checking
+        account_id: "1234567890"
+        description: Transfer to FBO Account
+        created_at: 2000-01-23T04:56:07.000+00:00
+        id: "1234567890"
+        routing_number: "123456789"
+        status: pending
+      properties:
+        id:
+          description: The unique identifier for the transfer
+          example: "1234567890"
+          readOnly: true
+          type: string
+        account_id:
+          description: The identifier for the Chariot account that will send the transfer.
+          example: "1234567890"
+          type: string
+        description:
+          description: |
+            A description of the transfer.
+            Remittance information for the transfer that will show on the recipient's bank statement.
+          example: Transfer to FBO Account
+          type: string
+        amount:
+          description: The transfer amount in USD cents. A positive amount originates
+            a credit transfer pushing funds to the receiving account. A negative amount
+            originates a debit transfer pulling funds from the receiving account.
+          example: 10000
+          format: int64
+          type: integer
+        account_number:
+          description: The account number for the destination account.
+          example: "1234567890"
+          type: string
+        routing_number:
+          description: The American Bankers' Association (ABA) Routing Transit Number
+            (RTN) for the destination account.
+          example: "123456789"
+          type: string
+        funding:
+          description: The type of the account to which the transfer will be sent.
+          enum:
+          - checking
+          - savings
+          example: checking
+          type: string
+        transaction_id:
+          description: The unique identifier for the transaction funding the transfer.
+          example: transaction_uyrp7fld2ium70oa7oi
+          readOnly: true
+          type: string
+        status:
+          description: The status of the transfer
+          enum:
+          - canceled
+          - pending
+          - submitted
+          - returned
+          - rejected
+          example: pending
+          type: string
+        created_at:
+          description: The date and time the transfer was created
+          format: date-time
+          readOnly: true
+          type: string
+      required:
+      - account_id
+      - account_number
+      - amount
+      - description
+      - routing_number
+      type: object
+    TransferList:
+      description: A list of transfers
+      example:
+        data:
+        - transaction_id: transaction_uyrp7fld2ium70oa7oi
+          account_number: "1234567890"
+          amount: 10000
+          funding: checking
+          account_id: "1234567890"
+          description: Transfer to FBO Account
+          created_at: 2000-01-23T04:56:07.000+00:00
+          id: "1234567890"
+          routing_number: "123456789"
+          status: pending
+        - transaction_id: transaction_uyrp7fld2ium70oa7oi
+          account_number: "1234567890"
+          amount: 10000
+          funding: checking
+          account_id: "1234567890"
+          description: Transfer to FBO Account
+          created_at: 2000-01-23T04:56:07.000+00:00
+          id: "1234567890"
+          routing_number: "123456789"
+          status: pending
+        paging:
+          cursors:
+            before: eyJpZCI6IjEyMzQ1Njc4OTAiLCJ0aW1lc3RhbXAiOiIyMDIwLTA3LTEwIDE1OjAwOjAwLjAwMCJ9
+            after: eyJpZCI6IjEyMzQ1Njc4OTAiLCJ0aW1lc3RhbXAiOiIyMDIwLTA3LTEwIDE1OjAwOjAwLjAwMCJ9
+          total: 100
+      properties:
+        data:
+          description: The list of transfers
+          items:
+            $ref: '#/components/schemas/Transfer'
+          type: array
+        paging:
+          $ref: '#/components/schemas/Pagination'
+    Pagination:
+      description: The paging information
+      example:
+        cursors:
+          before: eyJpZCI6IjEyMzQ1Njc4OTAiLCJ0aW1lc3RhbXAiOiIyMDIwLTA3LTEwIDE1OjAwOjAwLjAwMCJ9
+          after: eyJpZCI6IjEyMzQ1Njc4OTAiLCJ0aW1lc3RhbXAiOiIyMDIwLTA3LTEwIDE1OjAwOjAwLjAwMCJ9
+        total: 100
+      properties:
+        cursors:
+          $ref: '#/components/schemas/Pagination_cursors'
+        total:
+          description: The total number of objects
+          example: 100
+          type: integer
+    Payment:
+      description: A payment moves funds from a Chariot account to a verified nonprofit
+        recipient.
+      example:
+        transaction_id: transaction_uyrp7fld2ium70oa7oi
+        amount: 10000
+        account_id: "1234567890"
+        description: Payment to Nonprofit
+        chariot_id: "1200321"
+        id: "1234567890"
+        recipient_id: charity_658744hjksd23j
+        status: pending
+      properties:
+        id:
+          description: The unique identifier for the payment
+          example: "1234567890"
+          readOnly: true
+          type: string
+        account_id:
+          description: The identifier for the Chariot account that will send the payment.
+          example: "1234567890"
+          type: string
+        amount:
+          description: The payment amount in USD cents. Must be a positive amount.
+          example: 10000
+          format: int64
+          type: integer
+        recipient_id:
+          description: The identifier for the organization that will receive the payment.
+          example: charity_658744hjksd23j
+          type: string
+        description:
+          description: |
+            A description of the payment.
+            Remittance information for the payment that will show on the recipient's bank statement.
+          example: Payment to Nonprofit
+          type: string
+        chariot_id:
+          description: |
+            The unique identifier for the initiated payment from Chariot.
+            This is useful if the payment was initiated by Chariot and allows for end-to-end tracking of the payment for the donor.
+          example: "1200321"
+          type: string
+        transaction_id:
+          description: The unique identifier for the transaction funding the payment.
+          example: transaction_uyrp7fld2ium70oa7oi
+          readOnly: true
+          type: string
+        status:
+          description: The status of the payment
+          enum:
+          - canceled
+          - pending
+          - submitted
+          - complete
+          - rejected
+          example: pending
+          type: string
+      required:
+      - account_id
+      - amount
+      - description
+      - recipient_id
+      type: object
+    PaymentList:
+      description: A list of payments
+      example:
+        data:
+        - transaction_id: transaction_uyrp7fld2ium70oa7oi
+          amount: 10000
+          account_id: "1234567890"
+          description: Payment to Nonprofit
+          chariot_id: "1200321"
+          id: "1234567890"
+          recipient_id: charity_658744hjksd23j
+          status: pending
+        - transaction_id: transaction_uyrp7fld2ium70oa7oi
+          amount: 10000
+          account_id: "1234567890"
+          description: Payment to Nonprofit
+          chariot_id: "1200321"
+          id: "1234567890"
+          recipient_id: charity_658744hjksd23j
+          status: pending
+        paging:
+          cursors:
+            before: eyJpZCI6IjEyMzQ1Njc4OTAiLCJ0aW1lc3RhbXAiOiIyMDIwLTA3LTEwIDE1OjAwOjAwLjAwMCJ9
+            after: eyJpZCI6IjEyMzQ1Njc4OTAiLCJ0aW1lc3RhbXAiOiIyMDIwLTA3LTEwIDE1OjAwOjAwLjAwMCJ9
+          total: 100
+      properties:
+        data:
+          description: The list of payments
+          items:
+            $ref: '#/components/schemas/Payment'
+          type: array
+        paging:
+          $ref: '#/components/schemas/Pagination'
+    Recipient:
+      description: A recipient is a verified nonprofit organization account that can
+        receive payments.
+      example:
+        name: Nonprofit
+        created_at: 2000-01-23T04:56:07.000+00:00
+        id: charity_658744hjksd23j
+        ein: "123456789"
+        primary: true
+        status: verified
+      properties:
+        id:
+          description: The unique identifier for the recipient
+          example: charity_658744hjksd23j
+          readOnly: true
+          type: string
+        name:
+          description: The name of the recipient
+          example: Nonprofit
+          type: string
+        ein:
+          description: The Employer Identification Number (EIN) for the recipient.
+          example: "123456789"
+          type: string
+        primary:
+          description: |
+            Indicates whether the recipient is the primary recipient for the EIN.
+            Only one recipient can be the primary recipient for an EIN.
+          example: true
+          type: boolean
+        status:
+          description: The status of the recipient
+          enum:
+          - unverified
+          - verified
+          example: verified
+          type: string
+        created_at:
+          description: The date and time the recipient was created
+          format: date-time
+          readOnly: true
+          type: string
+      type: object
+    RecipientList:
+      description: A list of recipients
+      example:
+        data:
+        - name: Nonprofit
+          created_at: 2000-01-23T04:56:07.000+00:00
+          id: charity_658744hjksd23j
+          ein: "123456789"
+          primary: true
+          status: verified
+        - name: Nonprofit
+          created_at: 2000-01-23T04:56:07.000+00:00
+          id: charity_658744hjksd23j
+          ein: "123456789"
+          primary: true
+          status: verified
+        paging:
+          cursors:
+            before: eyJpZCI6IjEyMzQ1Njc4OTAiLCJ0aW1lc3RhbXAiOiIyMDIwLTA3LTEwIDE1OjAwOjAwLjAwMCJ9
+            after: eyJpZCI6IjEyMzQ1Njc4OTAiLCJ0aW1lc3RhbXAiOiIyMDIwLTA3LTEwIDE1OjAwOjAwLjAwMCJ9
+          total: 0
+      properties:
+        data:
+          description: The list of recipients
+          items:
+            $ref: '#/components/schemas/Recipient'
+          type: array
+        paging:
+          $ref: '#/components/schemas/RecipientList_paging'
+    ApiError:
+      description: An API error
+      properties:
+        timestamp:
+          description: The date and time the error occurred
+          format: date-time
+          readOnly: true
+          type: string
+        status:
+          description: The HTTP status code
+          readOnly: true
+          type: integer
+        error:
+          description: The HTTP status message
+          readOnly: true
+          type: string
+        message:
+          description: The error message
+          readOnly: true
+          type: string
+      type: object
+    Pagination_cursors:
+      description: The cursors for the next and previous pages
+      example:
+        before: eyJpZCI6IjEyMzQ1Njc4OTAiLCJ0aW1lc3RhbXAiOiIyMDIwLTA3LTEwIDE1OjAwOjAwLjAwMCJ9
+        after: eyJpZCI6IjEyMzQ1Njc4OTAiLCJ0aW1lc3RhbXAiOiIyMDIwLTA3LTEwIDE1OjAwOjAwLjAwMCJ9
+      properties:
+        before:
+          description: The cursor for the previous page
+          example: eyJpZCI6IjEyMzQ1Njc4OTAiLCJ0aW1lc3RhbXAiOiIyMDIwLTA3LTEwIDE1OjAwOjAwLjAwMCJ9
+          type: string
+        after:
+          description: The cursor for the next page
+          example: eyJpZCI6IjEyMzQ1Njc4OTAiLCJ0aW1lc3RhbXAiOiIyMDIwLTA3LTEwIDE1OjAwOjAwLjAwMCJ9
+          type: string
+      type: object
+    RecipientList_paging:
+      description: The paging information
+      example:
+        cursors:
+          before: eyJpZCI6IjEyMzQ1Njc4OTAiLCJ0aW1lc3RhbXAiOiIyMDIwLTA3LTEwIDE1OjAwOjAwLjAwMCJ9
+          after: eyJpZCI6IjEyMzQ1Njc4OTAiLCJ0aW1lc3RhbXAiOiIyMDIwLTA3LTEwIDE1OjAwOjAwLjAwMCJ9
+        total: 0
+      properties:
+        cursors:
+          $ref: '#/components/schemas/Pagination_cursors'
+        total:
+          type: integer
+      type: object
+  securitySchemes:
+    bearerAuth:
+      bearerFormat: Opaque
+      scheme: bearer
+      type: http

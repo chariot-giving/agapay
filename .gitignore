@@ -1,0 +1,11 @@
+# MacOS system files
+.DS_Store
+
+# Build files
+dist
+
+agapay
+
+# Env files
+.env
+*.log
