@@ -103,6 +103,13 @@ var routes = Routes{
 	},
 
 	{
+		"ListAccounts",
+		http.MethodGet,
+		"/accounts",
+		ListAccounts,
+	},
+
+	{
 		"GetAccountBalances",
 		http.MethodGet,
 		"/accounts/:id/balances",
@@ -131,6 +138,13 @@ var routes = Routes{
 	},
 
 	{
+		"CreateRecipient",
+		http.MethodPost,
+		"/recipients",
+		CreateRecipient,
+	},
+
+	{
 		"GetRecipient",
 		http.MethodGet,
 		"/recipients/:id",
@@ -142,6 +156,20 @@ var routes = Routes{
 		http.MethodGet,
 		"/recipients",
 		ListRecipients,
+	},
+
+	{
+		"GetTransaction",
+		http.MethodGet,
+		"/transactions/:id",
+		GetTransaction,
+	},
+
+	{
+		"ListTransactions",
+		http.MethodGet,
+		"/transactions",
+		ListTransactions,
 	},
 
 	{

@@ -12,6 +12,7 @@ package openapi
 
 import (
 	"net/http"
+	"strconv"
 
 	"github.com/chariot-giving/agapay/pkg/bank"
 	"github.com/gin-gonic/gin"
@@ -107,4 +108,59 @@ func GetAccount(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, &account)
+}
+
+// ListAccounts - List accounts
+func ListAccounts(c *gin.Context) {
+	limitQuery := c.DefaultQuery("limit", "100")
+	limit, err := strconv.ParseInt(limitQuery, 10, 64)
+	if err != nil {
+		limit = 100
+	}
+
+	listParams := increase.AccountListParams{
+		Limit: increase.Int(limit),
+	}
+
+	cursor, ok := c.GetQuery("cursor")
+	if ok {
+		listParams.Cursor = increase.String(cursor)
+	} else {
+		listParams.Cursor = increase.Null[string]()
+	}
+
+	// this comes from auth middleware
+	entity := c.Value("entity")
+	if entity != nil {
+		listParams.EntityID = increase.String(entity.(string))
+	}
+
+	response, err := bank.IncreaseClient.Accounts.List(c, listParams)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	accounts := make([]Account, len(response.Data))
+	for i, bankAccount := range response.Data {
+		accounts[i] = Account{
+			Id:        bankAccount.ID,
+			Name:      bankAccount.Name,
+			Status:    string(bankAccount.Status),
+			CreatedAt: bankAccount.CreatedAt,
+		}
+	}
+
+	accountList := AccountList{
+		Data: accounts,
+		Paging: Pagination{
+			Total: int32(len(response.Data)),
+			Cursors: PaginationCursors{
+				Before: cursor,
+				After:  response.NextCursor,
+			},
+		},
+	}
+
+	c.JSON(http.StatusOK, &accountList)
 }

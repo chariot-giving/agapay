@@ -19,6 +19,99 @@ security:
 - bearerAuth: []
 paths:
   /accounts:
+    get:
+      description: |
+        List accounts.
+        This endpoint is used to list accounts.
+      operationId: listAccounts
+      parameters:
+      - description: Limit the size of the list that is returned. The default (and
+          maximum) is 100 objects.
+        explode: true
+        in: query
+        name: limit
+        required: false
+        schema:
+          format: int32
+          type: integer
+        style: form
+      - description: "The cursor to use for pagination. If not set, the first page\
+          \ of results will be returned."
+        explode: true
+        in: query
+        name: cursor
+        required: false
+        schema:
+          type: string
+        style: form
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccountList'
+          description: The accounts were retrieved
+        "400":
+          content:
+            application/json:
+              example:
+                timestamp: 2020-07-10 15:00:00.000
+                code: 400
+                error: Bad Request
+                message: Expected an API key to be provided in the header `x-chariot-api-key`
+              schema:
+                $ref: '#/components/schemas/ApiError'
+          description: The request is invalid or contains invalid parameters
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/X-Request-Id'
+        "401":
+          content:
+            application/json:
+              example:
+                timestamp: 2020-07-10 15:00:00.000
+                code: 401
+                error: Unauthorized
+                message: Unauthorized
+              schema:
+                $ref: '#/components/schemas/ApiError'
+          description: Unauthorized. The request is missing the security (OAuth2 Bearer
+            token) requirements and the server is unable to verify the identify of
+            the caller.
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/X-Request-Id'
+        "403":
+          content:
+            application/json:
+              example:
+                timestamp: 2020-07-10 15:00:00.000
+                code: 403
+                error: Forbidden
+                message: User is not allowed to access this resource
+              schema:
+                $ref: '#/components/schemas/ApiError'
+          description: Access denied
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/X-Request-Id'
+        "409":
+          content:
+            application/json:
+              example:
+                timestamp: 2020-07-10 15:00:00.000
+                code: 409
+                error: Conflict
+                message: Request conflicts with an already existing resource
+              schema:
+                $ref: '#/components/schemas/ApiError'
+          description: Resource Conflicts
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/X-Request-Id'
+      summary: List accounts
+      tags:
+      - accounts
     post:
       description: |
         Create a bank account with Chariot.
@@ -968,6 +1061,70 @@ paths:
       summary: List recipients
       tags:
       - recipients
+    post:
+      description: |
+        Create a recipient.
+        This endpoint is used to create a recipient.
+      operationId: createRecipient
+      requestBody:
+        $ref: '#/components/requestBodies/CreateRecipientRequest'
+      responses:
+        "201":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Recipient'
+          description: The recipient was created
+          headers:
+            Location:
+              $ref: '#/components/headers/Location'
+        "400":
+          content:
+            application/json:
+              example:
+                timestamp: 2020-07-10 15:00:00.000
+                code: 400
+                error: Bad Request
+                message: Expected an API key to be provided in the header `x-chariot-api-key`
+              schema:
+                $ref: '#/components/schemas/ApiError'
+          description: The request is invalid or contains invalid parameters
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/X-Request-Id'
+        "401":
+          content:
+            application/json:
+              example:
+                timestamp: 2020-07-10 15:00:00.000
+                code: 401
+                error: Unauthorized
+                message: Unauthorized
+              schema:
+                $ref: '#/components/schemas/ApiError'
+          description: Unauthorized. The request is missing the security (OAuth2 Bearer
+            token) requirements and the server is unable to verify the identify of
+            the caller.
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/X-Request-Id'
+        "409":
+          content:
+            application/json:
+              example:
+                timestamp: 2020-07-10 15:00:00.000
+                code: 409
+                error: Conflict
+                message: Request conflicts with an already existing resource
+              schema:
+                $ref: '#/components/schemas/ApiError'
+          description: Resource Conflicts
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/X-Request-Id'
+      summary: Create a recipient
+      tags:
+      - recipients
   /recipients/{id}:
     get:
       description: |
@@ -1065,6 +1222,177 @@ paths:
       summary: Retrieve a recipient
       tags:
       - recipients
+  /transactions:
+    get:
+      description: |
+        List transactions.
+        This endpoint is used to list transactions for an account.
+      operationId: listTransactions
+      parameters:
+      - description: The unique identifier for the account
+        explode: true
+        in: query
+        name: account_id
+        required: true
+        schema:
+          type: string
+        style: form
+      - description: Limit the size of the list that is returned. The default (and
+          maximum) is 100 objects.
+        explode: true
+        in: query
+        name: limit
+        required: false
+        schema:
+          format: int32
+          type: integer
+        style: form
+      - description: "The cursor to use for pagination. If not set, the first page\
+          \ of results will be returned."
+        explode: true
+        in: query
+        name: cursor
+        required: false
+        schema:
+          type: string
+        style: form
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TransactionList'
+          description: The transactions were retrieved
+        "400":
+          content:
+            application/json:
+              example:
+                timestamp: 2020-07-10 15:00:00.000
+                code: 400
+                error: Bad Request
+                message: Expected an API key to be provided in the header `x-chariot-api-key`
+              schema:
+                $ref: '#/components/schemas/ApiError'
+          description: The request is invalid or contains invalid parameters
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/X-Request-Id'
+        "401":
+          content:
+            application/json:
+              example:
+                timestamp: 2020-07-10 15:00:00.000
+                code: 401
+                error: Unauthorized
+                message: Unauthorized
+              schema:
+                $ref: '#/components/schemas/ApiError'
+          description: Unauthorized. The request is missing the security (OAuth2 Bearer
+            token) requirements and the server is unable to verify the identify of
+            the caller.
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/X-Request-Id'
+        "403":
+          content:
+            application/json:
+              example:
+                timestamp: 2020-07-10 15:00:00.000
+                code: 403
+                error: Forbidden
+                message: User is not allowed to access this resource
+              schema:
+                $ref: '#/components/schemas/ApiError'
+          description: Access denied
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/X-Request-Id'
+      summary: List transactions
+      tags:
+      - transactions
+  /transactions/{id}:
+    get:
+      description: |
+        Get a transaction by its unique identifier.
+        This endpoint is used to retrieve a transaction by its unique identifier.
+      operationId: getTransaction
+      parameters:
+      - description: The unique identifier for the transaction
+        explode: false
+        in: path
+        name: id
+        required: true
+        schema:
+          type: string
+        style: simple
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Transaction'
+          description: The transaction was retrieved
+        "400":
+          content:
+            application/json:
+              example:
+                timestamp: 2020-07-10 15:00:00.000
+                code: 400
+                error: Bad Request
+                message: Expected an API key to be provided in the header `x-chariot-api-key`
+              schema:
+                $ref: '#/components/schemas/ApiError'
+          description: The request is invalid or contains invalid parameters
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/X-Request-Id'
+        "401":
+          content:
+            application/json:
+              example:
+                timestamp: 2020-07-10 15:00:00.000
+                code: 401
+                error: Unauthorized
+                message: Unauthorized
+              schema:
+                $ref: '#/components/schemas/ApiError'
+          description: Unauthorized. The request is missing the security (OAuth2 Bearer
+            token) requirements and the server is unable to verify the identify of
+            the caller.
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/X-Request-Id'
+        "404":
+          content:
+            application/json:
+              example:
+                timestamp: 2020-07-10 15:00:00.000
+                code: 404
+                error: Not Found
+                message: Resource is not found
+              schema:
+                $ref: '#/components/schemas/ApiError'
+          description: Resource Not Found
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/X-Request-Id'
+        "409":
+          content:
+            application/json:
+              example:
+                timestamp: 2020-07-10 15:00:00.000
+                code: 409
+                error: Conflict
+                message: Request conflicts with an already existing resource
+              schema:
+                $ref: '#/components/schemas/ApiError'
+          description: Resource Conflicts
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/X-Request-Id'
+      summary: Retrieve a transaction
+      tags:
+      - transactions
 components:
   headers:
     X-Request-Id:
@@ -1088,6 +1416,14 @@ components:
         format: uri
         type: string
       style: simple
+  requestBodies:
+    CreateRecipientRequest:
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/createRecipient_request'
+      description: The request body for creating a recipient
+      required: true
   responses:
     BadRequestError:
       content:
@@ -1233,6 +1569,36 @@ components:
           readOnly: true
           type: string
       type: object
+    AccountList:
+      description: A list of accounts
+      example:
+        data:
+        - account_number: "1234567890"
+          name: Payer FBO Account
+          created_at: 2000-01-23T04:56:07.000+00:00
+          id: "1234567890"
+          routing_number: "123456789"
+          status: open
+        - account_number: "1234567890"
+          name: Payer FBO Account
+          created_at: 2000-01-23T04:56:07.000+00:00
+          id: "1234567890"
+          routing_number: "123456789"
+          status: open
+        paging:
+          cursors:
+            before: eyJpZCI6IjEyMzQ1Njc4OTAiLCJ0aW1lc3RhbXAiOiIyMDIwLTA3LTEwIDE1OjAwOjAwLjAwMCJ9
+            after: eyJpZCI6IjEyMzQ1Njc4OTAiLCJ0aW1lc3RhbXAiOiIyMDIwLTA3LTEwIDE1OjAwOjAwLjAwMCJ9
+          total: 100
+      properties:
+        data:
+          description: The list of accounts
+          items:
+            $ref: '#/components/schemas/Account'
+          type: array
+        paging:
+          $ref: '#/components/schemas/Pagination'
+      type: object
     AccountBalance:
       description: The balance of an account
       example:
@@ -1260,122 +1626,6 @@ components:
           readOnly: true
           type: integer
       type: object
-    Transfer:
-      description: A transfer moves funds between accounts using ACH.
-      example:
-        transaction_id: transaction_uyrp7fld2ium70oa7oi
-        account_number: "1234567890"
-        amount: 10000
-        funding: checking
-        account_id: "1234567890"
-        description: Transfer to FBO Account
-        created_at: 2000-01-23T04:56:07.000+00:00
-        id: "1234567890"
-        routing_number: "123456789"
-        status: pending
-      properties:
-        id:
-          description: The unique identifier for the transfer
-          example: "1234567890"
-          readOnly: true
-          type: string
-        account_id:
-          description: The identifier for the Chariot account that will send the transfer.
-          example: "1234567890"
-          type: string
-        description:
-          description: |
-            A description of the transfer.
-            Remittance information for the transfer that will show on the recipient's bank statement.
-          example: Transfer to FBO Account
-          type: string
-        amount:
-          description: The transfer amount in USD cents. A positive amount originates
-            a credit transfer pushing funds to the receiving account. A negative amount
-            originates a debit transfer pulling funds from the receiving account.
-          example: 10000
-          format: int64
-          type: integer
-        account_number:
-          description: The account number for the destination account.
-          example: "1234567890"
-          type: string
-        routing_number:
-          description: The American Bankers' Association (ABA) Routing Transit Number
-            (RTN) for the destination account.
-          example: "123456789"
-          type: string
-        funding:
-          description: The type of the account to which the transfer will be sent.
-          enum:
-          - checking
-          - savings
-          example: checking
-          type: string
-        transaction_id:
-          description: The unique identifier for the transaction funding the transfer.
-          example: transaction_uyrp7fld2ium70oa7oi
-          readOnly: true
-          type: string
-        status:
-          description: The status of the transfer
-          enum:
-          - canceled
-          - pending
-          - submitted
-          - returned
-          - rejected
-          example: pending
-          type: string
-        created_at:
-          description: The date and time the transfer was created
-          format: date-time
-          readOnly: true
-          type: string
-      required:
-      - account_id
-      - account_number
-      - amount
-      - description
-      - routing_number
-      type: object
-    TransferList:
-      description: A list of transfers
-      example:
-        data:
-        - transaction_id: transaction_uyrp7fld2ium70oa7oi
-          account_number: "1234567890"
-          amount: 10000
-          funding: checking
-          account_id: "1234567890"
-          description: Transfer to FBO Account
-          created_at: 2000-01-23T04:56:07.000+00:00
-          id: "1234567890"
-          routing_number: "123456789"
-          status: pending
-        - transaction_id: transaction_uyrp7fld2ium70oa7oi
-          account_number: "1234567890"
-          amount: 10000
-          funding: checking
-          account_id: "1234567890"
-          description: Transfer to FBO Account
-          created_at: 2000-01-23T04:56:07.000+00:00
-          id: "1234567890"
-          routing_number: "123456789"
-          status: pending
-        paging:
-          cursors:
-            before: eyJpZCI6IjEyMzQ1Njc4OTAiLCJ0aW1lc3RhbXAiOiIyMDIwLTA3LTEwIDE1OjAwOjAwLjAwMCJ9
-            after: eyJpZCI6IjEyMzQ1Njc4OTAiLCJ0aW1lc3RhbXAiOiIyMDIwLTA3LTEwIDE1OjAwOjAwLjAwMCJ9
-          total: 100
-      properties:
-        data:
-          description: The list of transfers
-          items:
-            $ref: '#/components/schemas/Transfer'
-          type: array
-        paging:
-          $ref: '#/components/schemas/Pagination'
     Pagination:
       description: The paging information
       example:
@@ -1523,6 +1773,7 @@ components:
           - unverified
           - verified
           example: verified
+          readOnly: true
           type: string
         created_at:
           description: The date and time the recipient was created
@@ -1559,6 +1810,210 @@ components:
           type: array
         paging:
           $ref: '#/components/schemas/RecipientList_paging'
+    RecipientBankAddress:
+      description: The bank address for a recipient
+      properties:
+        account_number:
+          description: The account number
+          example: "1234567890"
+          type: string
+        routing_number:
+          description: The American Bankers' Association (ABA) Routing Transit Number
+            (RTN).
+          example: "123456789"
+          type: string
+      required:
+      - account_number
+      - routing_number
+      type: object
+    Transaction:
+      description: Transactions are the immutable additions and removals of money
+        from your account. They're the equivalent of line items on your bank statement.
+      example:
+        amount: 10000
+        account_id: "1234567890"
+        description: Payment to Nonprofit
+        created_at: 2000-01-23T04:56:07.000+00:00
+        id: transaction_uyrp7fld2ium70oa7oi
+      properties:
+        id:
+          description: The unique identifier for the transaction
+          example: transaction_uyrp7fld2ium70oa7oi
+          readOnly: true
+          type: string
+        account_id:
+          description: The unique identifier for the account
+          example: "1234567890"
+          readOnly: true
+          type: string
+        amount:
+          description: The transaction amount in USD cents. A positive amount represents
+            a credit to the account. A negative amount represents a debit to the account.
+          example: 10000
+          format: int64
+          readOnly: true
+          type: integer
+        description:
+          description: An informational message describing this transaction. Use the
+            fields in source to get more detailed information. This field appears
+            as the line-item on the statement.
+          example: Payment to Nonprofit
+          readOnly: true
+          type: string
+        created_at:
+          description: The date and time the transaction was created
+          format: date-time
+          readOnly: true
+          type: string
+      required:
+      - account_id
+      - amount
+      - description
+      - id
+      type: object
+    TransactionList:
+      description: A list of transactions
+      example:
+        data:
+        - amount: 10000
+          account_id: "1234567890"
+          description: Payment to Nonprofit
+          created_at: 2000-01-23T04:56:07.000+00:00
+          id: transaction_uyrp7fld2ium70oa7oi
+        - amount: 10000
+          account_id: "1234567890"
+          description: Payment to Nonprofit
+          created_at: 2000-01-23T04:56:07.000+00:00
+          id: transaction_uyrp7fld2ium70oa7oi
+        paging:
+          cursors:
+            before: eyJpZCI6IjEyMzQ1Njc4OTAiLCJ0aW1lc3RhbXAiOiIyMDIwLTA3LTEwIDE1OjAwOjAwLjAwMCJ9
+            after: eyJpZCI6IjEyMzQ1Njc4OTAiLCJ0aW1lc3RhbXAiOiIyMDIwLTA3LTEwIDE1OjAwOjAwLjAwMCJ9
+          total: 100
+      properties:
+        data:
+          description: The list of transactions
+          items:
+            $ref: '#/components/schemas/Transaction'
+          type: array
+        paging:
+          $ref: '#/components/schemas/Pagination'
+    Transfer:
+      description: A transfer moves funds between accounts using ACH.
+      example:
+        transaction_id: transaction_uyrp7fld2ium70oa7oi
+        account_number: "1234567890"
+        amount: 10000
+        funding: checking
+        account_id: "1234567890"
+        description: Transfer to FBO Account
+        created_at: 2000-01-23T04:56:07.000+00:00
+        id: "1234567890"
+        routing_number: "123456789"
+        status: pending
+      properties:
+        id:
+          description: The unique identifier for the transfer
+          example: "1234567890"
+          readOnly: true
+          type: string
+        account_id:
+          description: The identifier for the Chariot account that will send the transfer.
+          example: "1234567890"
+          type: string
+        description:
+          description: |
+            A description of the transfer.
+            Remittance information for the transfer that will show on the recipient's bank statement.
+          example: Transfer to FBO Account
+          type: string
+        amount:
+          description: The transfer amount in USD cents. A positive amount originates
+            a credit transfer pushing funds to the receiving account. A negative amount
+            originates a debit transfer pulling funds from the receiving account.
+          example: 10000
+          format: int64
+          type: integer
+        account_number:
+          description: The account number for the destination account.
+          example: "1234567890"
+          type: string
+        routing_number:
+          description: The American Bankers' Association (ABA) Routing Transit Number
+            (RTN) for the destination account.
+          example: "123456789"
+          type: string
+        funding:
+          description: The type of the account to which the transfer will be sent.
+          enum:
+          - checking
+          - savings
+          example: checking
+          type: string
+        transaction_id:
+          description: The unique identifier for the transaction funding the transfer.
+          example: transaction_uyrp7fld2ium70oa7oi
+          readOnly: true
+          type: string
+        status:
+          description: The status of the transfer
+          enum:
+          - canceled
+          - pending
+          - submitted
+          - returned
+          - rejected
+          example: pending
+          type: string
+        created_at:
+          description: The date and time the transfer was created
+          format: date-time
+          readOnly: true
+          type: string
+      required:
+      - account_id
+      - account_number
+      - amount
+      - description
+      - routing_number
+      type: object
+    TransferList:
+      description: A list of transfers
+      example:
+        data:
+        - transaction_id: transaction_uyrp7fld2ium70oa7oi
+          account_number: "1234567890"
+          amount: 10000
+          funding: checking
+          account_id: "1234567890"
+          description: Transfer to FBO Account
+          created_at: 2000-01-23T04:56:07.000+00:00
+          id: "1234567890"
+          routing_number: "123456789"
+          status: pending
+        - transaction_id: transaction_uyrp7fld2ium70oa7oi
+          account_number: "1234567890"
+          amount: 10000
+          funding: checking
+          account_id: "1234567890"
+          description: Transfer to FBO Account
+          created_at: 2000-01-23T04:56:07.000+00:00
+          id: "1234567890"
+          routing_number: "123456789"
+          status: pending
+        paging:
+          cursors:
+            before: eyJpZCI6IjEyMzQ1Njc4OTAiLCJ0aW1lc3RhbXAiOiIyMDIwLTA3LTEwIDE1OjAwOjAwLjAwMCJ9
+            after: eyJpZCI6IjEyMzQ1Njc4OTAiLCJ0aW1lc3RhbXAiOiIyMDIwLTA3LTEwIDE1OjAwOjAwLjAwMCJ9
+          total: 100
+      properties:
+        data:
+          description: The list of transfers
+          items:
+            $ref: '#/components/schemas/Transfer'
+          type: array
+        paging:
+          $ref: '#/components/schemas/Pagination'
     ApiError:
       description: An API error
       properties:
@@ -1579,6 +2034,25 @@ components:
           description: The error message
           readOnly: true
           type: string
+      type: object
+    createRecipient_request:
+      properties:
+        name:
+          description: The name of the recipient
+          example: Chariot Giving
+          type: string
+        ein:
+          description: The Employer Identification Number (EIN) for the recipient.
+          example: "123456789"
+          type: string
+        primary:
+          description: |
+            Indicates whether the recipient is the primary recipient for the EIN.
+            Only one recipient can be the primary recipient for an EIN.
+          example: true
+          type: boolean
+        bank_address:
+          $ref: '#/components/schemas/RecipientBankAddress'
       type: object
     Pagination_cursors:
       description: The cursors for the next and previous pages

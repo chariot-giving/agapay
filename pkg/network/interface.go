@@ -5,6 +5,8 @@ var PayeeDB PayeeDatabase
 type PayeeDatabase interface {
 	// GetPayeeElectronicAccount returns the electronic account for the given payeeID.
 	GetPayeeElectronicAccount(payeeID string) (PayeeElectronicAccount, error)
+	// CreatePayeeElectronicAccount creates a new electronic account for the given payeeID.
+	CreatePayeeElectronicAccount(payeeID string, account PayeeElectronicAccount) error
 }
 
 func NewPayeeDatabase() PayeeDatabase {
