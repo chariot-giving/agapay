@@ -15,8 +15,65 @@ import (
 	"time"
 
 	"github.com/chariot-giving/agapay/pkg/bank"
+	"github.com/chariot-giving/agapay/pkg/network"
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 )
+
+// CreateRecipient - Create a recipient
+func CreateRecipient(c *gin.Context) {
+	request := new(CreateRecipientRequest)
+	if err := c.ShouldBindJSON(request); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// search EIN on guidestar
+
+	// TODO: store recipients within our DB (do this before or after increase.com API call?)
+	payeeId := uuid.New().String()
+	err := network.PayeeDB.CreatePayeeElectronicAccount(payeeId, network.PayeeElectronicAccount{
+		Name:          request.Name,
+		AccountNumber: request.BankAddress.AccountNumber,
+		RoutingNumber: request.BankAddress.RoutingNumber,
+	})
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// entity, err := bank.IncreaseClient.Entities.New(c, increase.EntityNewParams{
+	// 	Structure:   increase.F[increase.EntityNewParamsStructure](increase.EntityNewParamsStructureCorporation),
+	// 	Description: increase.String(request.Name),
+	// 	Corporation: increase.F[increase.EntityNewParamsCorporation](increase.EntityNewParamsCorporation{
+	// 		Name:          increase.String(request.Name),
+	// 		TaxIdentifier: increase.String(request.Ein),
+	// 		BeneficialOwners: increase.F[[]increase.EntityNewParamsCorporationBeneficialOwner]([]increase.EntityNewParamsCorporationBeneficialOwner{
+	// 			increase.EntityNewParamsCorporationBeneficialOwner{
+	// 				Individual: increase.F[increase.EntityNewParamsCorporationBeneficialOwnersIndividual](increase.EntityNewParamsCorporationBeneficialOwnersIndividual{
+
+	// 				}),
+	// 			},
+	// 		}),
+	// 	}),
+	// })
+	// if err != nil {
+	// 	c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+	// 	return
+	// }
+
+	recipient := Recipient{
+		Id:        payeeId,
+		Name:      request.Name,
+		Ein:       request.Ein,
+		Primary:   true,
+		Status:    "unverified",
+		CreatedAt: time.Now(),
+	}
+
+	c.Header("Location", "/recipients/"+recipient.Id)
+	c.JSON(http.StatusOK, &recipient)
+}
 
 // GetRecipient - Retrieve a recipient
 func GetRecipient(c *gin.Context) {

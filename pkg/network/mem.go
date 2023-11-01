@@ -18,6 +18,14 @@ func (d *inMemoryPayeeDatabase) GetPayeeElectronicAccount(payeeID string) (Payee
 	return account, nil
 }
 
+// CreatePayeeElectronicAccount implements PayeeDatabase.
+func (d *inMemoryPayeeDatabase) CreatePayeeElectronicAccount(payeeID string, account PayeeElectronicAccount) error {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	d.payeeElectronicAccounts[payeeID] = account
+	return nil
+}
+
 func newInMemoryPayeeDatabase() PayeeDatabase {
 	return &inMemoryPayeeDatabase{
 		payeeElectronicAccounts: map[string]PayeeElectronicAccount{},

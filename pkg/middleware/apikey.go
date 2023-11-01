@@ -33,6 +33,9 @@ func ApiKeyAuth() gin.HandlerFunc {
 			return
 		}
 
+		// TODO: add entity key to context for downstream data filtering
+		// do not set this for admin users
+
 		c.Next()
 	}
 }

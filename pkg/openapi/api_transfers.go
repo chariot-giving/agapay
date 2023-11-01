@@ -132,5 +132,6 @@ func TransferFunds(c *gin.Context) {
 	transfer.Status = string(achTransfer.Status)
 	transfer.CreatedAt = achTransfer.CreatedAt
 
+	c.Header("Location", "/transfers/"+transfer.Id)
 	c.JSON(http.StatusOK, transfer)
 }

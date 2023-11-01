@@ -34,11 +34,27 @@ func CreatePayment(c *gin.Context) {
 		return
 	}
 
+	accountNumbers, err := bank.IncreaseClient.AccountNumbers.List(c, increase.AccountNumberListParams{
+		AccountID: increase.String(payment.AccountId),
+		Status:    increase.F[increase.AccountNumberListParamsStatus](increase.AccountNumberListParamsStatusActive),
+	})
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	if len(accountNumbers.Data) == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "no active account numbers found"})
+		return
+	}
+
+	accountNumberId := accountNumbers.Data[0].ID
+
 	transfer, err := bank.IncreaseClient.RealTimePaymentsTransfers.New(c, increase.RealTimePaymentsTransferNewParams{
 		CreditorName:             increase.String(electronicAccount.Name),
 		Amount:                   increase.Int(payment.Amount),
 		RemittanceInformation:    increase.String(payment.Description),
-		SourceAccountNumberID:    increase.String(payment.AccountId),
+		SourceAccountNumberID:    increase.String(accountNumberId),
 		DestinationAccountNumber: increase.String(electronicAccount.AccountNumber),
 		DestinationRoutingNumber: increase.String(electronicAccount.RoutingNumber),
 	})
@@ -51,6 +67,7 @@ func CreatePayment(c *gin.Context) {
 	payment.TransactionId = transfer.TransactionID
 	payment.Status = string(transfer.Status)
 
+	c.Header("Location", "/payments/"+payment.Id)
 	c.JSON(http.StatusOK, payment)
 }
 
@@ -86,7 +103,6 @@ func ListPayments(c *gin.Context) {
 	if err != nil {
 		limit = 100
 	}
-	cursor := c.DefaultQuery("cursor", "")
 
 	accountId, ok := c.GetQuery("account_id")
 	if !ok {
@@ -94,14 +110,21 @@ func ListPayments(c *gin.Context) {
 		return
 	}
 
-	// TODO: filter by recipient ID in our database first
-	// recipientId := c.DefaultQuery("recipient_id", "")
-
-	response, err := bank.IncreaseClient.RealTimePaymentsTransfers.List(c, increase.RealTimePaymentsTransferListParams{
+	listParams := increase.RealTimePaymentsTransferListParams{
 		AccountID: increase.String(accountId),
 		Limit:     increase.Int(limit),
-		Cursor:    increase.String(cursor),
-	})
+	}
+
+	cursor, ok := c.GetQuery("cursor")
+	if ok {
+		listParams.Cursor = increase.String(cursor)
+	} else {
+		listParams.Cursor = increase.Null[string]()
+	}
+
+	// TODO: filter by recipient ID in our database first
+	// recipientId := c.DefaultQuery("recipient_id", "")
+	response, err := bank.IncreaseClient.RealTimePaymentsTransfers.List(c, listParams)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
 		return
