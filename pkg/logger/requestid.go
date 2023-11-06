@@ -1,4 +1,4 @@
-package middleware
+package logger
 
 import (
 	"github.com/gin-gonic/gin"

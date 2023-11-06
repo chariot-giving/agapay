@@ -15,6 +15,7 @@ import (
 	"strconv"
 
 	"github.com/chariot-giving/agapay/pkg/bank"
+	"github.com/chariot-giving/agapay/pkg/cerr"
 	"github.com/gin-gonic/gin"
 	"github.com/increase/increase-go"
 )
@@ -24,7 +25,7 @@ func CreateAccount(c *gin.Context) {
 	account := new(Account)
 	err := c.Bind(account)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.Error(cerr.NewBadRequest("invalid request body", err))
 		return
 	}
 
@@ -36,13 +37,18 @@ func CreateAccount(c *gin.Context) {
 
 	// TODO: add our own database + idempotency key logic to prevent duplicate accounts
 
-	bankAccount, err := bank.IncreaseClient.Accounts.New(c, increase.AccountNewParams{
+	newParams := increase.AccountNewParams{
 		Name: increase.String(account.Name),
-		//EntityID:              increase.String("account.EntityID"),              // TODO: figure out what this should be for an FBO account
-		//InformationalEntityID: increase.String("account.InformationalEntityID"), // TODO: figure out what this should be for an FBO account - most likely need to create an entity that represents each payer
-	})
+	}
+
+	entity, ok := c.Get("entity")
+	if ok {
+		newParams.EntityID = increase.String(entity.(string)) // TODO: figure out what this should be for an FBO account
+	}
+
+	bankAccount, err := bank.IncreaseClient.Accounts.New(c, newParams)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadGateway, cerr.NewBadGatewayError("error creating account", err))
 		return
 	}
 
@@ -57,7 +63,7 @@ func CreateAccount(c *gin.Context) {
 		}),
 	})
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadGateway, cerr.NewBadGatewayError("error creating account number", err))
 		return
 	}
 
@@ -78,7 +84,7 @@ func GetAccount(c *gin.Context) {
 
 	bankAccount, err := bank.IncreaseClient.Accounts.Get(c, id)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadGateway, cerr.NewBadGatewayError("error retrieving account", err))
 		return
 	}
 
@@ -87,12 +93,12 @@ func GetAccount(c *gin.Context) {
 		Status:    increase.F[increase.AccountNumberListParamsStatus](increase.AccountNumberListParamsStatusActive),
 	})
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadGateway, cerr.NewBadGatewayError("error retrieving account numbers", err))
 		return
 	}
 
 	if len(accountNumbers.Data) == 0 {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "no account numbers found"})
+		c.JSON(http.StatusNotFound, cerr.NewNotFoundError("account number not found", nil))
 		return
 	}
 
@@ -137,7 +143,7 @@ func ListAccounts(c *gin.Context) {
 
 	response, err := bank.IncreaseClient.Accounts.List(c, listParams)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadGateway, cerr.NewBadGatewayError("error listing accounts", err))
 		return
 	}
 

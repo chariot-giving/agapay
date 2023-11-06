@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/chariot-giving/agapay/pkg/bank"
+	"github.com/chariot-giving/agapay/pkg/cerr"
 	"github.com/gin-gonic/gin"
 	"github.com/increase/increase-go"
 )
@@ -28,7 +29,7 @@ func GetAccountBalances(c *gin.Context) {
 		AtTime:    increase.Null[time.Time](),
 	})
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadGateway, cerr.NewBadGatewayError("error retrieving account balances", err))
 		return
 	}
 

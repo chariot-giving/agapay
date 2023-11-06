@@ -15,6 +15,7 @@ import (
 	"strconv"
 
 	"github.com/chariot-giving/agapay/pkg/bank"
+	"github.com/chariot-giving/agapay/pkg/cerr"
 	"github.com/gin-gonic/gin"
 	"github.com/increase/increase-go"
 )
@@ -25,7 +26,7 @@ func GetTransfer(c *gin.Context) {
 
 	achTransfer, err := bank.IncreaseClient.ACHTransfers.Get(c, id)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadGateway, cerr.NewBadGatewayError("error retrieving transfer", err))
 		return
 	}
 
@@ -55,7 +56,7 @@ func ListTransfers(c *gin.Context) {
 
 	accountId, ok := c.GetQuery("account_id")
 	if !ok {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "account_id is required"})
+		c.JSON(http.StatusBadRequest, cerr.NewBadRequest("account_id is required", nil))
 		return
 	}
 	listParams := increase.ACHTransferListParams{
@@ -72,7 +73,7 @@ func ListTransfers(c *gin.Context) {
 
 	response, err := bank.IncreaseClient.ACHTransfers.List(c, listParams)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadGateway, cerr.NewBadGatewayError("error retrieving transfers", err))
 		return
 	}
 
@@ -110,7 +111,7 @@ func ListTransfers(c *gin.Context) {
 func TransferFunds(c *gin.Context) {
 	transfer := new(Transfer)
 	if err := c.ShouldBindJSON(transfer); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, cerr.NewBadRequest("invalid transfer", err))
 		return
 	}
 
@@ -123,7 +124,7 @@ func TransferFunds(c *gin.Context) {
 		Funding:             increase.F[increase.ACHTransferNewParamsFunding](increase.ACHTransferNewParamsFunding(transfer.Funding)),
 	})
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadGateway, cerr.NewBadGatewayError("error creating transfer", err))
 		return
 	}
 

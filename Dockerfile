@@ -1,15 +1,46 @@
-FROM golang:1.10 AS build
-WORKDIR /go/src
-COPY go ./go
-COPY main.go .
+FROM golang:1.19-buster as build
 
-ENV CGO_ENABLED=0
-RUN go get -d -v ./...
+WORKDIR /app
 
-RUN go build -a -installsuffix cgo -o openapi .
+# Development build stage
+# Air supports live reloading - https://github.com/cosmtrek/air
+FROM build as development
 
-FROM scratch AS runtime
-ENV GIN_MODE=release
-COPY --from=build /go/src/openapi ./
-EXPOSE 8080/tcp
-ENTRYPOINT ["./openapi"]
+RUN apt-get update && apt-get upgrade -y && \
+    apt-get install -y git \
+    make openssh-client
+
+RUN curl -fLo install.sh https://raw.githubusercontent.com/cosmtrek/air/master/install.sh \
+    && chmod +x install.sh && sh install.sh && cp ./bin/air /bin/air
+
+RUN go install github.com/go-delve/delve/cmd/dlv@latest
+
+# Port for the application
+EXPOSE 8088
+# Debugging port
+EXPOSE 1357
+
+ENTRYPOINT ["air"]
+
+# Production build stage
+FROM build as production-build-stage
+
+COPY go.mod ./
+COPY go.sum ./
+
+RUN go mod download
+
+COPY . .
+
+RUN CGO_ENABLED=0 GOOS=linux go build -o agapay .
+
+# Production
+FROM gcr.io/distroless/base-debian11:latest as production
+
+WORKDIR /
+
+COPY --from=production-build-stage /app/agapay .
+
+USER nonroot:nonroot
+
+ENTRYPOINT ["./agapay"]

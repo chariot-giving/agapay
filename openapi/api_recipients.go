@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/chariot-giving/agapay/pkg/bank"
+	"github.com/chariot-giving/agapay/pkg/cerr"
 	"github.com/chariot-giving/agapay/pkg/network"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -24,7 +25,7 @@ import (
 func CreateRecipient(c *gin.Context) {
 	request := new(CreateRecipientRequest)
 	if err := c.ShouldBindJSON(request); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, cerr.NewBadRequest("invalid request body", err))
 		return
 	}
 
@@ -38,7 +39,7 @@ func CreateRecipient(c *gin.Context) {
 		RoutingNumber: request.BankAddress.RoutingNumber,
 	})
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadGateway, cerr.NewBadGatewayError("error creating payee", err))
 		return
 	}
 
@@ -82,7 +83,7 @@ func GetRecipient(c *gin.Context) {
 	// TODO: do we store and retrieve recipients as entities within the Increase.com API/models?
 	entity, err := bank.IncreaseClient.Entities.Get(c, id)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		c.JSON(http.StatusNotFound, cerr.NewNotFoundError("recipient not found", err))
 		return
 	}
 

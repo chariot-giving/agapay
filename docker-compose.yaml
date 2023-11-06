@@ -1,0 +1,46 @@
+---
+version: "3.9"
+
+# below you will see the list of microservices
+# used for the development environment.
+# The goal is to keep the development and production
+# environment as similar as possible.
+services:
+  db:
+    container_name: agapay-db
+    image: postgres:latest
+    restart: always
+    command: -p 5433
+    environment:
+      POSTGRES_USER: ${DB_ROOT_USERNAME}
+      POSTGRES_PASSWORD: ${DB_ROOT_PASSWORD}
+    expose:
+      - "5433"
+    ports:
+      - "5433:5433"
+    networks:
+      - agapay
+
+  agapay:
+    container_name: agapay
+    image: ghcr.io/chariot/agapay:1.0.0
+    build:
+      context: .
+      target: development
+      dockerfile: Dockerfile
+    restart: always
+    environment:
+      PORT: 8088
+      INCREASE_SANDBOX: ${INCREASE_SANDBOX}
+      INCREASE_API_KEY: ${INCREASE_API_KEY}
+      BANK_ENTITY: ${BANK_ENTITY}
+      LOG_LEVEL: ${LOG_LEVEL}
+    ports:
+      - "8088:8088"
+    volumes:
+      - .:/app
+    networks:
+      - agapay
+
+networks:
+  agapay:
