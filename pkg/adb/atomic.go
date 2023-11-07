@@ -2,11 +2,14 @@ package adb
 
 import (
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"time"
 
+	"github.com/chariot-giving/agapay/pkg/cerr"
 	"github.com/jackc/pgx/v5/pgconn"
 	"go.uber.org/zap"
+	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
 
@@ -77,9 +80,7 @@ type RecoveryPointAction struct {
 
 func (r RecoveryPointAction) Exec(key PhaseKey) error {
 	if key.key == nil {
-		return ArgumentErr{
-			msg: "idempotency key must be provided",
-		}
+		return cerr.NewBadRequest("idempotency key must be provided to use a recovery point", nil)
 	}
 	return key.tx.Model(key.key).Update("recovery_point", string(r.Name)).Error
 }
@@ -88,38 +89,41 @@ func (r RecoveryPointAction) Exec(key PhaseKey) error {
 // idempotency key). One  possible option for a return from an #atomic_phase block.
 type Response struct {
 	Status int
-	Data   interface{}
+	Data   json.Marshaler
 }
 
 func (r Response) Exec(key PhaseKey) error {
 	if key.key == nil {
-		return ArgumentErr{
-			msg: "idempotency key must be provided",
-		}
+		return cerr.NewBadRequest("idempotency key must be provided to record a response", nil)
 	}
 	if r.Status == 0 {
-		return ArgumentErr{
-			msg: "response status must be provided",
-		}
+		return cerr.NewInternalServerError("response status must be provided", nil)
 	}
+
+	body, err := r.Data.MarshalJSON()
+	if err != nil {
+		return err
+	}
+
 	return key.tx.Model(key.key).Updates(IdempotencyKey{
 		LockedAt:      nil,
 		RecoveryPoint: RecoveryPointFinished,
 		ResponseCode:  r.Status,
-		ResponseBody:  r.Data,
+		ResponseBody:  body,
 	}).Error
 }
 
 type IdempotencyKey struct {
-	Id            int64         `gorm:"primaryKey;autoIncrement"`
-	Key           string        `gorm:"column:key;uniqueIndex"`
-	UserId        string        `gorm:"column:user_id"`
-	LastRunAt     time.Time     `gorm:"column:last_run_at"`
-	LockedAt      *time.Time    `gorm:"column:locked_at"`
-	RecoveryPoint RecoveryPoint `gorm:"column:recovery_point"`
-	RequestMethod string        `gorm:"column:request_method"`
-	RequestPath   string        `gorm:"column:request_path"`
-	RequestParams any           `gorm:"column:request_params"`
-	ResponseCode  int           `gorm:"column:response_code"`
-	ResponseBody  any           `gorm:"column:response_body"`
+	Id            uint64         `gorm:"primaryKey;autoIncrement"`
+	Key           string         `gorm:"column:key;uniqueIndex"`
+	UserId        uint64         `gorm:"column:user_id"`
+	LastRunAt     time.Time      `gorm:"column:last_run_at"`
+	LockedAt      *time.Time     `gorm:"column:locked_at"`
+	RecoveryPoint RecoveryPoint  `gorm:"column:recovery_point"`
+	RequestMethod string         `gorm:"column:request_method"`
+	RequestPath   string         `gorm:"column:request_path"`
+	RequestParams datatypes.JSON `gorm:"column:request_params"`
+	RequestBody   datatypes.JSON `gorm:"column:request_body"`
+	ResponseCode  int            `gorm:"column:response_code"`
+	ResponseBody  datatypes.JSON `gorm:"column:response_body"`
 }

@@ -13,27 +13,34 @@ func ApiKeyAuth() gin.HandlerFunc {
 		authorization := c.GetHeader("Authorization")
 		if authorization == "" {
 			c.Error(cerr.NewUnauthorizedError("Missing Authorization header", nil))
+			c.Abort()
 			return
 		}
 
 		parts := strings.Split(authorization, " ")
 		if len(parts) != 2 {
 			c.Error(cerr.NewUnauthorizedError("Invalid Authorization header", nil))
+			c.Abort()
 			return
 		}
 
 		if parts[0] != "Bearer" {
 			c.Error(cerr.NewUnauthorizedError("Invalid Authorization header", nil))
+			c.Abort()
 			return
 		}
 
 		bearerToken := parts[1]
 
 		// TODO: update this to use real auth service
-		if bearerToken != "chariot123" {
+		if bearerToken != "chariot$123" {
 			c.Error(cerr.NewUnauthorizedError("Invalid Authorization", nil))
+			c.Abort()
 			return
 		}
+
+		// TODO: source user from token
+		c.Set("user_id", uint64(0))
 
 		if entity, ok := os.LookupEnv("BANK_ENTITY"); ok {
 			// TODO: add entity key to context for downstream data filtering

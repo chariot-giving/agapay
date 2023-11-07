@@ -1,8 +1,13 @@
 package adb
 
 import (
+	"bytes"
+	"encoding/json"
+	"reflect"
 	"time"
 
+	"github.com/chariot-giving/agapay/pkg/cerr"
+	"go.uber.org/zap"
 	"gorm.io/gorm"
 )
 
@@ -15,10 +20,18 @@ const (
 // This should always be the first call whenever an idempotent request is received.
 func (db *AgapayDB) UpsertIdempotencyKey(request *IdempotentRequest) (*IdempotencyKey, error) {
 	key := new(IdempotencyKey)
-	err := db.AtomicPhase(nil, func(tx *gorm.DB) (PhaseAction, error) {
-		err := tx.Where("user_id = ? AND idempotency_key = ?", request.UserId, request.IdempotencyKey).First(key).Error
+	err := db.AtomicPhase(key, func(tx *gorm.DB) (PhaseAction, error) {
+		err := tx.Where("user_id = ? AND key = ?", request.UserId, request.IdempotencyKey).First(key).Error
 		if err != nil {
 			if err == gorm.ErrRecordNotFound {
+				params, err := json.Marshal(request.Params)
+				if err != nil {
+					return nil, err
+				}
+				body, err := json.Marshal(request.Body)
+				if err != nil {
+					return nil, err
+				}
 				now := time.Now()
 				// create a new key
 				key = &IdempotencyKey{
@@ -29,25 +42,43 @@ func (db *AgapayDB) UpsertIdempotencyKey(request *IdempotentRequest) (*Idempoten
 					RecoveryPoint: RecoveryPointStarted,
 					RequestMethod: request.Method,
 					RequestPath:   request.Path,
-					RequestParams: request.Params,
+					RequestParams: params,
+					RequestBody:   body,
+					ResponseBody:  body,
 				}
 				if err := tx.Create(key).Error; err != nil {
 					return nil, err
 				}
 				return Noop{}, nil
-			} else {
-				return nil, err
 			}
+			return nil, err
 		}
 
 		// programs sending multiple requestw with diff parameters but the same idempotency key is a bug
-		if key.RequestParams != request.Params {
-			return nil, IdempotencyKeyConflictErr{"request parameters do not match"}
+		keyParams := make(map[string]string)
+		if err := json.Unmarshal(key.RequestParams, &keyParams); err != nil {
+			return nil, err
+		}
+
+		if !reflect.DeepEqual(keyParams, request.Params) {
+			return nil, cerr.NewConflictError("request parameters do not match", nil)
+		}
+
+		body, err := json.Marshal(request.Body)
+		if err != nil {
+			return nil, err
+		}
+
+		requestBodyArg := bytes.ReplaceAll(body, []byte(" "), []byte(""))
+		keyBodyArg := bytes.ReplaceAll([]byte(key.RequestBody), []byte(" "), []byte(""))
+		if !bytes.EqualFold(requestBodyArg, keyBodyArg) {
+			db.logger.Error("request body does not match idempotent request", zap.Binary("request_body", requestBodyArg), zap.Binary("idempotent_request_body", keyBodyArg))
+			return nil, cerr.NewConflictError("request body does not match", nil)
 		}
 
 		// only acquire a lock if the key is unlocked or it's lock has expired
-		if key.LockedAt == nil || key.LockedAt.Add(DefaultLockDuration).Before(time.Now()) {
-			return nil, IdempotencyKeyConflictErr{"request is already in progress"}
+		if key.LockedAt != nil && key.LockedAt.Add(DefaultLockDuration).Before(time.Now()) {
+			return nil, cerr.NewConflictError("request is already in progress", nil)
 		}
 
 		// lock the key and update latest run time if request is not already finished

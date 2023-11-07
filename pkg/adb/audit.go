@@ -15,5 +15,5 @@ type AuditRecord struct {
 	OriginIp     string         `gorm:"column:origin_ip"`
 	ResourceType string         `gorm:"column:resource_type"`
 	ResourceId   string         `gorm:"column:resource_id"`
-	UserId       string         `gorm:"column:user_id"`
+	UserId       uint64         `gorm:"column:user_id"`
 }

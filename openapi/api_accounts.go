@@ -11,71 +11,123 @@
 package openapi
 
 import (
+	"errors"
 	"net/http"
 	"strconv"
 
+	"github.com/chariot-giving/agapay/pkg/adb"
 	"github.com/chariot-giving/agapay/pkg/bank"
 	"github.com/chariot-giving/agapay/pkg/cerr"
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 	"github.com/increase/increase-go"
+	"go.uber.org/zap"
 )
 
 // CreateAccount - Create an account
 func CreateAccount(c *gin.Context) {
-	account := new(Account)
-	err := c.Bind(account)
+	logger := c.Value("logger").(*zap.Logger)
+
+	requestBody := new(Account)
+	err := c.Bind(requestBody)
 	if err != nil {
 		c.Error(cerr.NewBadRequest("invalid request body", err))
 		return
 	}
 
-	// idempotencyKey := c.GetHeader("Idempotency-Key")
-	// if idempotencyKey == "" {
-	// 	c.JSON(http.StatusBadRequest, gin.H{"error": "Idempotency-Key header is required"})
-	// 	return
-	// }
-
-	// TODO: add our own database + idempotency key logic to prevent duplicate accounts
-
-	newParams := increase.AccountNewParams{
-		Name: increase.String(account.Name),
+	idempotencyKey := c.GetHeader("Idempotency-Key")
+	if idempotencyKey == "" {
+		idempotencyKey = uuid.NewString()
 	}
+	c.Header("Idempotency-Key", idempotencyKey)
 
-	entity, ok := c.Get("entity")
-	if ok {
-		newParams.EntityID = increase.String(entity.(string)) // TODO: figure out what this should be for an FBO account
+	logger.Info("creating account", zap.String("idempotency_key", idempotencyKey))
+
+	params := make(map[string]string)
+	for _, v := range c.Params {
+		params[v.Key] = v.Value
 	}
-
-	bankAccount, err := bank.IncreaseClient.Accounts.New(c, newParams)
+	request := &adb.IdempotentRequest{
+		UserId:         c.GetUint64("user_id"),
+		IdempotencyKey: idempotencyKey,
+		Method:         c.Request.Method,
+		Path:           c.Request.URL.Path,
+		Params:         params,
+		Body:           requestBody,
+	}
+	key, err := adb.AgapayDatabase.UpsertIdempotencyKey(request)
 	if err != nil {
-		c.JSON(http.StatusBadGateway, cerr.NewBadGatewayError("error creating account", err))
+		cErr := new(cerr.HttpError)
+		if errors.As(err, &cErr) {
+			c.Error(cErr)
+			return
+		}
+		c.Error(cerr.NewInternalServerError("failed to upsert idempotency key", err))
 		return
 	}
 
-	// create new idempotency key based on original key + account number
-	//accountNoIdempotencyKey := sha256.Sum256([]byte(idempotencyKey + "account_number"))
+	logger.Info("idempotency key upserted", zap.String("idempotency_key", idempotencyKey))
 
-	accountNo, err := bank.IncreaseClient.AccountNumbers.New(c, increase.AccountNumberNewParams{
-		AccountID: increase.String(bankAccount.ID),
-		Name:      increase.String(account.Name),
-		InboundACH: increase.F[increase.AccountNumberNewParamsInboundACH](increase.AccountNumberNewParamsInboundACH{
-			DebitStatus: increase.F[increase.AccountNumberNewParamsInboundACHDebitStatus](increase.AccountNumberNewParamsInboundACHDebitStatusBlocked),
-		}),
-	})
-	if err != nil {
-		c.JSON(http.StatusBadGateway, cerr.NewBadGatewayError("error creating account number", err))
-		return
+	account := new(adb.Account)
+
+	// start the loop
+	for {
+		switch key.RecoveryPoint {
+		case adb.RecoveryPointStarted:
+			// create the account
+			account = &adb.Account{
+				IdempotencyKeyId: key.Id,
+				UserId:           strconv.FormatUint(key.UserId, 10),
+				Name:             requestBody.Name,
+			}
+			_, err := adb.AgapayDatabase.CreateAccount(c, key, account)
+			if err != nil {
+				cErr := new(cerr.HttpError)
+				if errors.Is(err, cErr) {
+					c.Error(cErr)
+					return
+				}
+				c.Error(cerr.NewInternalServerError("failed to create account", err))
+				return
+			}
+		case adb.RecoveryPointAccountCreated:
+			// create the bank account
+			_, err := adb.AgapayDatabase.CreateBankAccount(c, key, account)
+			if err != nil {
+				cErr := new(cerr.HttpError)
+				if errors.Is(err, cErr) {
+					c.Error(cErr)
+					return
+				}
+				c.Error(cerr.NewInternalServerError("failed to create bank account", err))
+				return
+			}
+		case adb.RecoveryPointBankAccountCreated:
+			// create the bank account number
+			_, err := adb.AgapayDatabase.CreateBankAccountNumber(c, key, account)
+			if err != nil {
+				cErr := new(cerr.HttpError)
+				if errors.Is(err, cErr) {
+					c.Error(cErr)
+					return
+				}
+				c.Error(cerr.NewInternalServerError("failed to create bank account number", err))
+				return
+			}
+		case adb.RecoveryPointFinished:
+			// we're done
+		default:
+			c.Error(cerr.NewInternalServerError("bug: unknown recovery point", nil))
+			return
+		}
+
+		// if we're done, break out of the loop
+		if key.RecoveryPoint == adb.RecoveryPointFinished {
+			break
+		}
 	}
 
-	// update account
-	account.Id = bankAccount.ID
-	account.AccountNumber = accountNo.AccountNumber
-	account.RoutingNumber = accountNo.RoutingNumber
-	account.Status = string(bankAccount.Status)
-	account.CreatedAt = bankAccount.CreatedAt
-
-	c.Header("Location", "/accounts/"+account.Id)
-	c.JSON(http.StatusCreated, account)
+	c.JSON(key.ResponseCode, key.ResponseBody)
 }
 
 // GetAccount - Retrieve an account
@@ -105,15 +157,19 @@ func GetAccount(c *gin.Context) {
 	accountNo := accountNumbers.Data[0]
 
 	account := Account{
-		Id:            bankAccount.ID,
-		Name:          bankAccount.Name,
-		Status:        string(bankAccount.Status),
-		CreatedAt:     bankAccount.CreatedAt,
-		AccountNumber: accountNo.AccountNumber,
-		RoutingNumber: accountNo.RoutingNumber,
+		Id:                    bankAccount.ID,
+		Name:                  bankAccount.Name,
+		CreatedAt:             bankAccount.CreatedAt,
+		UsBankAccountId:       bankAccount.ID,
+		UsBankAccountNumberId: accountNo.ID,
 	}
 
 	c.JSON(http.StatusOK, &account)
+}
+
+// GetAccountDetails - Retrieve account details
+func GetAccountDetails(c *gin.Context) {
+	c.JSON(http.StatusOK, gin.H{})
 }
 
 // ListAccounts - List accounts
@@ -152,7 +208,6 @@ func ListAccounts(c *gin.Context) {
 		accounts[i] = Account{
 			Id:        bankAccount.ID,
 			Name:      bankAccount.Name,
-			Status:    string(bankAccount.Status),
 			CreatedAt: bankAccount.CreatedAt,
 		}
 	}

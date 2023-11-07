@@ -57,8 +57,8 @@ func NewRouter() *gin.Engine {
 	middlewares := []gin.HandlerFunc{
 		logger.RequestIDMiddleware(),
 		logger.LoggingMiddleware(zapLogger),
-		cerr.ErrorHandler(),
 		auth.ApiKeyAuth(),
+		cerr.ErrorHandler(),
 	}
 	router.Use(middlewares...)
 
@@ -105,6 +105,13 @@ var routes = Routes{
 		http.MethodGet,
 		"/accounts/:id",
 		GetAccount,
+	},
+
+	{
+		"GetAccountDetails",
+		http.MethodGet,
+		"/accounts/:id/details",
+		GetAccountDetails,
 	},
 
 	{

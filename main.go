@@ -13,27 +13,28 @@ package main
 import (
 	"log"
 
-	"github.com/chariot-giving/agapay/db"
 	"github.com/chariot-giving/agapay/openapi"
+	"github.com/chariot-giving/agapay/pkg/adb"
 	"github.com/chariot-giving/agapay/pkg/network"
 )
 
 func main() {
 	router := openapi.NewRouter()
 
-	client := db.NewClient()
-	if err := client.Prisma.Connect(); err != nil {
-		panic(err)
-	}
+	// client := db.NewClient()
+	// if err := client.Prisma.Connect(); err != nil {
+	// 	panic(err)
+	// }
 
-	defer func() {
-		if err := client.Prisma.Disconnect(); err != nil {
-			panic(err)
-		}
-	}()
+	// defer func() {
+	// 	if err := client.Prisma.Disconnect(); err != nil {
+	// 		panic(err)
+	// 	}
+	// }()
 
 	// initialize global variable
 	network.PayeeDB = network.NewPayeeDatabase()
+	adb.NewAgapayDatabase()
 
 	log.Fatal(router.Run(":8088"))
 }

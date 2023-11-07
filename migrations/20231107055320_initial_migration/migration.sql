@@ -15,7 +15,7 @@ CREATE TABLE "user" (
 -- CreateTable
 CREATE TABLE "idempotency_key" (
     "id" BIGSERIAL NOT NULL,
-    "key" UUID NOT NULL,
+    "key" VARCHAR(255) NOT NULL,
     "last_run_at" TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "locked_at" TIMESTAMPTZ(6) DEFAULT CURRENT_TIMESTAMP,
     "request_method" VARCHAR(10) NOT NULL,

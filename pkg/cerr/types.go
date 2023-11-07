@@ -33,6 +33,19 @@ func (he HttpError) MarshalJSON() ([]byte, error) {
 		}{he.Timestamp, he.Code, he.Message, he.ErrorMsg, details})
 }
 
+func NewHttpError(code int, msg string, cause error) *HttpError {
+	err := &HttpError{
+		Timestamp: time.Now(),
+		Code:      code,
+		ErrorMsg:  http.StatusText(code),
+		Message:   msg,
+	}
+	if cause != nil {
+		err.Details = cause
+	}
+	return err
+}
+
 func NewBadRequest(msg string, cause error) *HttpError {
 	err := &HttpError{
 		Timestamp: time.Now(),

@@ -6,6 +6,21 @@ dotenv.config();
 
 const prisma = new PrismaClient();
 
+async function seedUsers() {
+  const user = await prisma.user.upsert({
+    where: {
+      id: 0,
+    },
+    create: {
+      id: 0,
+      email: "",
+    },
+    update: {},
+  });
+
+  console.log("Created user", user);
+}
+
 async function seedOrganizations() {
   const cgn = await prisma.organization.upsert({
     where: {
@@ -70,6 +85,10 @@ async function seedRecipients() {
 
 async function main() {
   console.time("seed");
+
+  console.log("Seeding users...");
+  await seedUsers();
+  console.timeLog("seed", "Successfully seeded users");
 
   console.log("Seeding organizations...");
   await seedOrganizations();

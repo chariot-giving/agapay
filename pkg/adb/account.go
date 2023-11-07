@@ -3,89 +3,26 @@ package adb
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strconv"
+	"time"
 
 	"github.com/chariot-giving/agapay/pkg/bank"
-	"github.com/gin-gonic/gin"
+	"github.com/chariot-giving/agapay/pkg/cerr"
 	"github.com/increase/increase-go"
 	"github.com/increase/increase-go/option"
 	"gorm.io/gorm"
 )
 
-func (db *AgapayDB) CreateAccountDag(c *gin.Context) (*Account, error) {
-	request := &IdempotentRequest{
-		UserId:         c.GetString("user_id"),
-		IdempotencyKey: c.GetHeader("Idempotency-Key"),
-		Method:         c.Request.Method,
-		Path:           c.Request.URL.Path,
-		Params:         nil, // TODO: pass through params
-	}
-	key, err := db.UpsertIdempotencyKey(request)
-	if err != nil {
-		return nil, err
-	}
-
-	var account Account
-
-	// start the loop
-	for {
-		switch key.RecoveryPoint {
-		case RecoveryPointStarted:
-			// create the account
-			createdAccount, err := db.CreateAccount(c, key, request.Params)
-			if err != nil {
-				return nil, err
-			}
-			account = *createdAccount
-			key.RecoveryPoint = RecoveryPointAccountCreated
-		case RecoveryPointAccountCreated:
-			// create the bank account
-			createdAccount, err := db.CreateBankAccount(c, key, &account)
-			if err != nil {
-				return nil, err
-			}
-			account = *createdAccount
-			key.RecoveryPoint = RecoveryPointBankAccountCreated
-		case RecoveryPointBankAccountCreated:
-			// create the bank account number
-			createdAccount, err := db.CreateBankAccountNumber(c, key, &account)
-			if err != nil {
-				return nil, err
-			}
-			account = *createdAccount
-			key.RecoveryPoint = RecoveryPointFinished
-		case RecoveryPointFinished:
-			// we're done
-		default:
-			return nil, fmt.Errorf("bug: unknown recovery point %s", key.RecoveryPoint)
-		}
-
-		// if we're done, break out of the loop
-		if key.RecoveryPoint == RecoveryPointFinished {
-			break
-		}
-	}
-
-	return &account, nil
-}
-
 // CreateAccount creates a new account
-func (db *AgapayDB) CreateAccount(ctx context.Context, key *IdempotencyKey, params any) (*Account, error) {
-	account := new(Account)
+func (db *AgapayDB) CreateAccount(ctx context.Context, key *IdempotencyKey, account *Account) (*Account, error) {
 	err := db.AtomicPhase(key, func(tx *gorm.DB) (PhaseAction, error) {
-		account = &Account{
-			Name:                "", // TODO: pass through in params
-			BankAccountId:       nil,
-			BankAccountNumberId: nil,
-			IdempotencyKeyId:    key.Id,
-			UserId:              key.UserId,
-		}
 		if err := tx.Create(account).Error; err != nil {
 			return nil, err
 		}
 
-		data, err := json.Marshal(params)
+		data, err := json.Marshal(account)
 		if err != nil {
 			return nil, err
 		}
@@ -133,7 +70,11 @@ func (db *AgapayDB) CreateBankAccount(ctx context.Context, key *IdempotencyKey, 
 			Name: increase.String(account.Name),
 		}, option.WithHeader("X-Idempotency-Key", bankIdempotencyKey))
 		if err != nil {
-			return Response{Status: 503, Data: err}, nil
+			var apierr *increase.Error
+			if errors.As(err, &apierr) {
+				return Response{Status: apierr.StatusCode, Data: cerr.NewHttpError(apierr.StatusCode, "failed to create bank account", apierr)}, nil
+			}
+			return Response{Status: 503, Data: cerr.NewHttpError(503, "failed to create bank account", err)}, nil
 		}
 
 		account.BankAccountId = &bankAccount.ID
@@ -177,7 +118,11 @@ func (db *AgapayDB) CreateBankAccountNumber(ctx context.Context, key *Idempotenc
 			}),
 		}, option.WithHeader("X-Idempotency-Key", bankIdempotencyKey))
 		if err != nil {
-			return Response{Status: 503, Data: err}, nil
+			var apierr *increase.Error
+			if errors.As(err, &apierr) {
+				return Response{Status: apierr.StatusCode, Data: cerr.NewHttpError(apierr.StatusCode, "failed to create bank account numbers", apierr)}, nil
+			}
+			return Response{Status: 503, Data: cerr.NewHttpError(503, "failed to create bank account numbers", err)}, nil
 		}
 
 		account.BankAccountNumberId = &accountNo.ID
@@ -185,7 +130,7 @@ func (db *AgapayDB) CreateBankAccountNumber(ctx context.Context, key *Idempotenc
 		if err := tx.Updates(account).Error; err != nil {
 			return nil, err
 		}
-		return Response{Status: 201, Data: nil}, nil
+		return Response{Status: 201, Data: account}, nil
 	})
 	if err != nil {
 		return nil, err
@@ -195,10 +140,27 @@ func (db *AgapayDB) CreateBankAccountNumber(ctx context.Context, key *Idempotenc
 }
 
 type Account struct {
-	Id                  *int64  `gorm:"primary_key;auto_increment"`
-	Name                string  `gorm:"column:name"`
-	BankAccountId       *string `gorm:"column:bank_account_id"`
-	BankAccountNumberId *string `gorm:"column:bank_account_number_id"`
-	IdempotencyKeyId    int64   `gorm:"column:idempotency_key_id;index"`
-	UserId              string  `gorm:"column:user_id"`
+	Id                  *int64     `gorm:"primary_key;auto_increment"`
+	Name                string     `gorm:"column:name"`
+	BankAccountId       *string    `gorm:"column:bank_account_id"`
+	BankAccountNumberId *string    `gorm:"column:bank_account_number_id"`
+	IdempotencyKeyId    uint64     `gorm:"column:idempotency_key_id;index"`
+	UserId              string     `gorm:"column:user_id"`
+	CreatedAt           *time.Time `gorm:"column:created_at;autoCreateTime"`
+}
+
+func (a *Account) MarshalJSON() ([]byte, error) {
+	return json.Marshal(struct {
+		Id                  *int64  `json:"id"`
+		Name                string  `json:"name"`
+		BankAccountId       *string `json:"bank_account_id"`
+		BankAccountNumberId *string `json:"bank_account_number_id"`
+		CreatedAt           string  `json:"created_at"`
+	}{
+		Id:                  a.Id,
+		Name:                a.Name,
+		BankAccountId:       a.BankAccountId,
+		BankAccountNumberId: a.BankAccountNumberId,
+		CreatedAt:           a.CreatedAt.Format(time.RFC3339),
+	})
 }

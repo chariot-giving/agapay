@@ -22,14 +22,11 @@ type Account struct {
 	// The name of the account
 	Name string `json:"name,omitempty"`
 
-	// The account number
-	AccountNumber string `json:"account_number,omitempty"`
+	// The unique identifier for the US bank account
+	UsBankAccountId string `json:"us_bank_account_id,omitempty"`
 
-	// The American Bankers' Association (ABA) Routing Transit Number (RTN).
-	RoutingNumber string `json:"routing_number,omitempty"`
-
-	// The status of the account
-	Status string `json:"status,omitempty"`
+	// The unique identifier for the US bank account number
+	UsBankAccountNumberId string `json:"us_bank_account_number_id,omitempty"`
 
 	// The date and time the account was created
 	CreatedAt time.Time `json:"created_at,omitempty"`
