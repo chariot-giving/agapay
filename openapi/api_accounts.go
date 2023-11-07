@@ -16,6 +16,7 @@ import (
 	"strconv"
 
 	"github.com/chariot-giving/agapay/pkg/adb"
+	"github.com/chariot-giving/agapay/pkg/auth"
 	"github.com/chariot-giving/agapay/pkg/bank"
 	"github.com/chariot-giving/agapay/pkg/cerr"
 	"github.com/gin-gonic/gin"
@@ -48,7 +49,7 @@ func CreateAccount(c *gin.Context) {
 		params[v.Key] = v.Value
 	}
 	request := &adb.IdempotentRequest{
-		UserId:         c.GetUint64("user_id"),
+		UserId:         auth.UserId(c),
 		IdempotencyKey: idempotencyKey,
 		Method:         c.Request.Method,
 		Path:           c.Request.URL.Path,
@@ -70,7 +71,7 @@ func CreateAccount(c *gin.Context) {
 
 	account := new(adb.Account)
 
-	// start the loop
+	// start the state machine
 	for {
 		switch key.RecoveryPoint {
 		case adb.RecoveryPointStarted:
@@ -83,7 +84,7 @@ func CreateAccount(c *gin.Context) {
 			_, err := adb.AgapayDatabase.CreateAccount(c, key, account)
 			if err != nil {
 				cErr := new(cerr.HttpError)
-				if errors.Is(err, cErr) {
+				if errors.As(err, &cErr) {
 					c.Error(cErr)
 					return
 				}
@@ -95,7 +96,7 @@ func CreateAccount(c *gin.Context) {
 			_, err := adb.AgapayDatabase.CreateBankAccount(c, key, account)
 			if err != nil {
 				cErr := new(cerr.HttpError)
-				if errors.Is(err, cErr) {
+				if errors.As(err, &cErr) {
 					c.Error(cErr)
 					return
 				}
@@ -107,7 +108,7 @@ func CreateAccount(c *gin.Context) {
 			_, err := adb.AgapayDatabase.CreateBankAccountNumber(c, key, account)
 			if err != nil {
 				cErr := new(cerr.HttpError)
-				if errors.Is(err, cErr) {
+				if errors.As(err, &cErr) {
 					c.Error(cErr)
 					return
 				}
@@ -134,6 +135,24 @@ func CreateAccount(c *gin.Context) {
 func GetAccount(c *gin.Context) {
 	id := c.Param("id")
 
+	account, err := adb.AgapayDatabase.GetAccount(c, id)
+	if err != nil {
+		cErr := new(cerr.HttpError)
+		if errors.As(err, &cErr) {
+			c.Error(cErr)
+			return
+		}
+		c.Error(cerr.NewInternalServerError("failed to retrieve account", err))
+		return
+	}
+
+	c.JSON(http.StatusOK, &account)
+}
+
+// GetAccountDetails - Retrieve account details
+func GetAccountDetails(c *gin.Context) {
+	id := c.Param("id")
+
 	bankAccount, err := bank.IncreaseClient.Accounts.Get(c, id)
 	if err != nil {
 		c.JSON(http.StatusBadGateway, cerr.NewBadGatewayError("error retrieving account", err))
@@ -156,20 +175,15 @@ func GetAccount(c *gin.Context) {
 
 	accountNo := accountNumbers.Data[0]
 
-	account := Account{
-		Id:                    bankAccount.ID,
-		Name:                  bankAccount.Name,
-		CreatedAt:             bankAccount.CreatedAt,
-		UsBankAccountId:       bankAccount.ID,
-		UsBankAccountNumberId: accountNo.ID,
+	// TODO: create audit log record for accessing account details
+
+	accountDetails := AccountDetails{
+		AccountNumber: accountNo.AccountNumber,
+		RoutingNumber: accountNo.RoutingNumber,
+		Status:        string(bankAccount.Status),
 	}
 
-	c.JSON(http.StatusOK, &account)
-}
-
-// GetAccountDetails - Retrieve account details
-func GetAccountDetails(c *gin.Context) {
-	c.JSON(http.StatusOK, gin.H{})
+	c.JSON(http.StatusOK, accountDetails)
 }
 
 // ListAccounts - List accounts

@@ -139,6 +139,14 @@ func (db *AgapayDB) CreateBankAccountNumber(ctx context.Context, key *Idempotenc
 	return account, nil
 }
 
+func (db *AgapayDB) GetAccount(ctx context.Context, id string) (*Account, error) {
+	account := &Account{}
+	if err := db.DB.Where("id = ?", id).First(account).Error; err != nil {
+		return nil, err
+	}
+	return account, nil
+}
+
 type Account struct {
 	Id                  *int64     `gorm:"primary_key;auto_increment"`
 	Name                string     `gorm:"column:name"`

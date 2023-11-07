@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"context"
 	"os"
 	"strings"
 
@@ -50,4 +51,12 @@ func ApiKeyAuth() gin.HandlerFunc {
 
 		c.Next()
 	}
+}
+
+func UserId(ctx context.Context) uint64 {
+	userId := ctx.Value("user_id")
+	if userId != nil {
+		return userId.(uint64)
+	}
+	return 0
 }
