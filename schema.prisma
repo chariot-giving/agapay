@@ -9,6 +9,7 @@ datasource db {
 }
 
 // user is a table to store the users of the API
+// users are the payers and the callers of the API
 model user {
   // the unique identifier for the user
   id              BigInt            @id @default(autoincrement()) @db.BigInt
@@ -21,7 +22,7 @@ model user {
   transfer        transfer[]
 }
 
-// idemporancy_keys is a table to store the idempotency keys for the API
+// idemporancy_key is a table to store the idempotency keys for the API
 model idempotency_key {
   // the unique identifier for the idempotency key
   id          BigInt    @id @default(autoincrement()) @db.BigInt
@@ -171,7 +172,7 @@ model payment {
   recipient_id       String           @db.Uuid
   recipient          recipient        @relation(fields: [recipient_id], references: [id], onDelete: Cascade, onUpdate: Cascade, map: "fk_payment_recipient")
   // the identifier of the chariot initiated grant for reconciliation purposes
-  chariot_id         String           @db.VarChar(255)
+  chariot_id         String?          @db.VarChar(255)
   // store a reference to the idempotency key so that we can recover an already created payment
   // idempotency keys are not stored permanently so this gets set to NULL when a referenced key is deleted
   idempotency_key_id BigInt?          @db.BigInt
