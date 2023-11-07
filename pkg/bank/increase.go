@@ -1,6 +1,8 @@
 package bank
 
 import (
+	"os"
+
 	"github.com/increase/increase-go"
 	"github.com/increase/increase-go/option"
 )
@@ -9,9 +11,16 @@ import (
 var IncreaseClient *increase.Client
 
 func init() {
-	client := increase.NewClient(
+	_, ok := os.LookupEnv("INCREASE_SANDBOX")
+	if ok {
+		client := increase.NewClient(
+			// defaults to os.LookupEnv("INCREASE_API_KEY")
+			option.WithEnvironmentSandbox(), // defaults to option.WithEnvironmentProduction()
+		)
+		IncreaseClient = client
+	} else {
 		// defaults to os.LookupEnv("INCREASE_API_KEY")
-		option.WithEnvironmentSandbox(), // defaults to option.WithEnvironmentProduction()
-	)
-	IncreaseClient = client
+		client := increase.NewClient()
+		IncreaseClient = client
+	}
 }

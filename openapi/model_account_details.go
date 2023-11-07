@@ -10,17 +10,8 @@
 
 package openapi
 
-import (
-	"time"
-)
-
-type Account struct {
-
-	// The unique identifier for the account
-	Id string `json:"id,omitempty"`
-
-	// The name of the account
-	Name string `json:"name,omitempty"`
+// AccountDetails - The details of an account
+type AccountDetails struct {
 
 	// The account number
 	AccountNumber string `json:"account_number,omitempty"`
@@ -30,7 +21,4 @@ type Account struct {
 
 	// The status of the account
 	Status string `json:"status,omitempty"`
-
-	// The date and time the account was created
-	CreatedAt time.Time `json:"created_at,omitempty"`
 }

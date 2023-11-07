@@ -1,4 +1,4 @@
-package middleware
+package logger
 
 import (
 	"github.com/gin-gonic/gin"
@@ -22,6 +22,7 @@ func RequestIDMiddleware() gin.HandlerFunc {
 		// Set the id to ensure that the requestid is in the response
 		c.Header(requestID, rid)
 		c.Set(requestID, rid)
+		c.Set("origin_ip", c.ClientIP())
 		c.Next()
 	}
 }

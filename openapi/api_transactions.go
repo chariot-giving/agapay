@@ -15,6 +15,7 @@ import (
 	"strconv"
 
 	"github.com/chariot-giving/agapay/pkg/bank"
+	"github.com/chariot-giving/agapay/pkg/cerr"
 	"github.com/gin-gonic/gin"
 	"github.com/increase/increase-go"
 )
@@ -25,7 +26,7 @@ func GetTransaction(c *gin.Context) {
 
 	tx, err := bank.IncreaseClient.Transactions.Get(c, id)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadGateway, cerr.NewBadGatewayError("error retrieving transaction", err))
 		return
 	}
 
@@ -47,21 +48,28 @@ func ListTransactions(c *gin.Context) {
 	if err != nil {
 		limit = 100
 	}
-	cursor := c.DefaultQuery("cursor", "")
 
 	accountId, ok := c.GetQuery("account_id")
 	if !ok {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "account_id is required"})
+		c.JSON(http.StatusBadRequest, cerr.NewBadRequest("account_id is required", nil))
 		return
 	}
 
-	response, err := bank.IncreaseClient.Transactions.List(c, increase.TransactionListParams{
+	listParams := increase.TransactionListParams{
 		AccountID: increase.String(accountId),
 		Limit:     increase.Int(limit),
-		Cursor:    increase.String(cursor),
-	})
+	}
+
+	cursor, ok := c.GetQuery("cursor")
+	if ok {
+		listParams.Cursor = increase.String(cursor)
+	} else {
+		listParams.Cursor = increase.Null[string]()
+	}
+
+	response, err := bank.IncreaseClient.Transactions.List(c, listParams)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadGateway, cerr.NewBadGatewayError("error retrieving transactions", err))
 		return
 	}
 

@@ -15,8 +15,9 @@ import (
 	"net/http"
 	"os"
 
+	"github.com/chariot-giving/agapay/pkg/auth"
+	"github.com/chariot-giving/agapay/pkg/cerr"
 	"github.com/chariot-giving/agapay/pkg/logger"
-	"github.com/chariot-giving/agapay/pkg/middleware"
 	"github.com/gin-gonic/gin"
 )
 
@@ -38,6 +39,9 @@ type Routes []Route
 // NewRouter returns a new router.
 func NewRouter() *gin.Engine {
 	router := gin.Default()
+	router.NoRoute(func(c *gin.Context) {
+		c.Error(cerr.NewNotFoundError("route not found", nil))
+	})
 
 	logLevel := os.Getenv("LOG_LEVEL")
 	if logLevel == "" {
@@ -51,9 +55,10 @@ func NewRouter() *gin.Engine {
 
 	// add middleware
 	middlewares := []gin.HandlerFunc{
-		middleware.RequestIDMiddleware(),
-		middleware.LoggingMiddleware(zapLogger),
-		middleware.ApiKeyAuth(),
+		logger.RequestIDMiddleware(),
+		logger.LoggingMiddleware(zapLogger),
+		auth.ApiKeyAuth(),
+		cerr.ErrorHandler(),
 	}
 	router.Use(middlewares...)
 
@@ -100,6 +105,13 @@ var routes = Routes{
 		http.MethodGet,
 		"/accounts/:id",
 		GetAccount,
+	},
+
+	{
+		"GetAccountDetails",
+		http.MethodGet,
+		"/accounts/:id/details",
+		GetAccountDetails,
 	},
 
 	{

@@ -9,3 +9,6 @@ agapay
 # Env files
 .env
 *.log
+
+/tmp
+node_modules
