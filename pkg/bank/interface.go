@@ -18,7 +18,10 @@ type Bank interface {
 	CreateAccountNumber(context.Context, CreateAccountNumberRequest) (*CreateAccountNumberResponse, error)
 
 	// Get account numbers
-	GetAccountNumbers(context.Context, GetAccountNumbersRequest) (*GetAccountNumbersResponse, error)
+	GetAccountDetails(context.Context, GetAccountDetailsRequest) (*GetAccountDetailsResponse, error)
+
+	// Get account balance
+	GetAccountBalance(context.Context, GetAccountBalanceRequest) (*GetAccountBalanceResponse, error)
 
 	// Transfer funds
 	TransferFunds(context.Context, TransferFundsRequest) (*TransferFundsResponse, error)
@@ -31,6 +34,9 @@ type Bank interface {
 
 	// Get payment details
 	GetPayment(context.Context, GetPaymentRequest) (*GetPaymentResponse, error)
+
+	// Get transaction details
+	GetTransaction(context.Context, GetTransactionRequest) (*Transaction, error)
 
 	// List transactions
 	ListTransactions(context.Context, ListTransactionsRequest) (*ListTransactionsResponse, error)
@@ -71,16 +77,28 @@ type CreateAccountNumberResponse struct {
 	ID string
 }
 
-type GetAccountNumbersRequest struct {
+type GetAccountDetailsRequest struct {
 	AccountID       string
 	AccountNumberID string
 }
 
-type GetAccountNumbersResponse struct {
+type GetAccountDetailsResponse struct {
+	Status  AccountStatus
+	Numbers []AccountNumber
+}
+
+type AccountNumber struct {
 	Status        AccountNumberStatus
 	AccountNumber string
 	RoutingNumber string
 }
+
+type AccountStatus string
+
+const (
+	AccountStatusActive   AccountStatus = "active"
+	AccountStatusInactive AccountStatus = "inactive"
+)
 
 type AccountNumberStatus string
 
@@ -89,6 +107,15 @@ const (
 	AccountNumberStatusDisabled AccountNumberStatus = "disabled"
 	AccountNumberCancelled      AccountNumberStatus = "cancelled"
 )
+
+type GetAccountBalanceRequest struct {
+	AccountID string
+}
+
+type GetAccountBalanceResponse struct {
+	CurrentBalance   int64
+	AvailableBalance int64
+}
 
 type TransferFundsRequest struct {
 	AccountID      string
@@ -117,8 +144,16 @@ type GetTransferResponse struct {
 	AccountNumber string
 	RoutingNumber string
 	TransactionID string
+	Funding       TransferFunding
 	Status        string
 }
+
+type TransferFunding string
+
+const (
+	TransferFundingChecking TransferFunding = "checking"
+	TransferFundingSavings  TransferFunding = "savings"
+)
 
 type CreatePaymentRequest struct {
 	AccountID       string
@@ -132,9 +167,8 @@ type CreatePaymentRequest struct {
 }
 
 type PaymentMethod struct {
-	Name string
-	Ach  *AchPaymentMethod
-	Rtp  *RtpPaymentMethod
+	Ach *AchPaymentMethod
+	Rtp *RtpPaymentMethod
 }
 
 type AchPaymentMethod struct {
@@ -181,6 +215,10 @@ type Transaction struct {
 	Amount      int64
 	Description string
 	CreatedAt   time.Time
+}
+
+type GetTransactionRequest struct {
+	ID string
 }
 
 type ListTransactionsRequest struct {

@@ -30,8 +30,6 @@ type Route struct {
 	Method string
 	// Pattern is the pattern of the URI.
 	Pattern string
-	// HandlerFunc is the handler function of this route.
-	HandlerFunc gin.HandlerFunc
 }
 
 // Routes is the list of the generated Route.
@@ -55,20 +53,23 @@ func NewRouter(server *core.AgapayServer) *gin.Engine {
 	}
 	router.Use(middlewares...)
 
-	// TODO: add routes
+	openApiServer := openAPIServer{
+		core: server,
+	}
 
 	for _, route := range routes {
+		handler := openApiServer.getHandler(route.Name)
 		switch route.Method {
 		case http.MethodGet:
-			router.GET(route.Pattern, route.HandlerFunc)
+			router.GET(route.Pattern, handler)
 		case http.MethodPost:
-			router.POST(route.Pattern, route.HandlerFunc)
+			router.POST(route.Pattern, handler)
 		case http.MethodPut:
-			router.PUT(route.Pattern, route.HandlerFunc)
+			router.PUT(route.Pattern, handler)
 		case http.MethodPatch:
-			router.PATCH(route.Pattern, route.HandlerFunc)
+			router.PATCH(route.Pattern, handler)
 		case http.MethodDelete:
-			router.DELETE(route.Pattern, route.HandlerFunc)
+			router.DELETE(route.Pattern, handler)
 		}
 	}
 
@@ -85,118 +86,101 @@ var routes = Routes{
 		"Index",
 		http.MethodGet,
 		"/",
-		Index,
 	},
 
 	{
 		"CreateAccount",
 		http.MethodPost,
 		"/accounts",
-		CreateAccount,
 	},
 
 	{
 		"GetAccount",
 		http.MethodGet,
 		"/accounts/:id",
-		GetAccount,
 	},
 
 	{
 		"GetAccountDetails",
 		http.MethodGet,
 		"/accounts/:id/details",
-		GetAccountDetails,
 	},
 
 	{
 		"ListAccounts",
 		http.MethodGet,
 		"/accounts",
-		ListAccounts,
 	},
 
 	{
 		"GetAccountBalances",
 		http.MethodGet,
 		"/accounts/:id/balances",
-		GetAccountBalances,
 	},
 
 	{
 		"CreatePayment",
 		http.MethodPost,
 		"/payments",
-		CreatePayment,
 	},
 
 	{
 		"GetPayment",
 		http.MethodGet,
 		"/payments/:id",
-		GetPayment,
 	},
 
 	{
 		"ListPayments",
 		http.MethodGet,
 		"/payments",
-		ListPayments,
 	},
 
 	{
 		"CreateRecipient",
 		http.MethodPost,
 		"/recipients",
-		CreateRecipient,
 	},
 
 	{
 		"GetRecipient",
 		http.MethodGet,
 		"/recipients/:id",
-		GetRecipient,
 	},
 
 	{
 		"ListRecipients",
 		http.MethodGet,
 		"/recipients",
-		ListRecipients,
 	},
 
 	{
 		"GetTransaction",
 		http.MethodGet,
 		"/transactions/:id",
-		GetTransaction,
 	},
 
 	{
 		"ListTransactions",
 		http.MethodGet,
 		"/transactions",
-		ListTransactions,
 	},
 
 	{
 		"GetTransfer",
 		http.MethodGet,
 		"/transfers/:id",
-		GetTransfer,
 	},
 
 	{
 		"ListTransfers",
 		http.MethodGet,
 		"/transfers",
-		ListTransfers,
 	},
 
 	{
 		"TransferFunds",
 		http.MethodPost,
 		"/transfers",
-		TransferFunds,
 	},
 }

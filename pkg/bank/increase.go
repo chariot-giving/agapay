@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/chariot-giving/agapay/pkg/cerr"
 	"github.com/increase/increase-go"
@@ -124,7 +125,16 @@ func (bank *increaseBank) CreatePayment(ctx context.Context, request CreatePayme
 }
 
 // GetAccountNumbers implements Bank.
-func (bank *increaseBank) GetAccountNumbers(ctx context.Context, request GetAccountNumbersRequest) (*GetAccountNumbersResponse, error) {
+func (bank *increaseBank) GetAccountDetails(ctx context.Context, request GetAccountDetailsRequest) (*GetAccountDetailsResponse, error) {
+	bankAccount, err := bank.client.Accounts.Get(ctx, request.AccountID)
+	if err != nil {
+		var apierr *increase.Error
+		if errors.As(err, &apierr) {
+			return nil, cerr.NewHttpError(apierr.StatusCode, "failed to get account", apierr)
+		}
+		return nil, cerr.NewHttpError(503, "failed to get account", err)
+	}
+
 	accountNumbers, err := bank.client.AccountNumbers.List(ctx, increase.AccountNumberListParams{
 		AccountID: increase.String(request.AccountID),
 		Status:    increase.F[increase.AccountNumberListParamsStatus](increase.AccountNumberListParamsStatusActive),
@@ -141,12 +151,38 @@ func (bank *increaseBank) GetAccountNumbers(ctx context.Context, request GetAcco
 		return nil, cerr.NewNotFoundError("account number not found", nil)
 	}
 
-	accountNo := accountNumbers.Data[0]
+	numbers := make([]AccountNumber, len(accountNumbers.Data))
+	for i, accountNo := range accountNumbers.Data {
+		numbers[i] = AccountNumber{
+			Status:        AccountNumberStatus(accountNo.Status),
+			AccountNumber: accountNo.AccountNumber,
+			RoutingNumber: accountNo.RoutingNumber,
+		}
+	}
 
-	return &GetAccountNumbersResponse{
-		Status:        AccountNumberStatus(accountNo.Status),
-		AccountNumber: accountNo.AccountNumber,
-		RoutingNumber: accountNo.RoutingNumber,
+	return &GetAccountDetailsResponse{
+		Status:  AccountStatus(bankAccount.Status),
+		Numbers: numbers,
+	}, nil
+}
+
+// GetAccountBalance implements Bank.
+func (bank *increaseBank) GetAccountBalance(ctx context.Context, request GetAccountBalanceRequest) (*GetAccountBalanceResponse, error) {
+	balanceLookup, err := bank.client.BalanceLookups.Lookup(ctx, increase.BalanceLookupLookupParams{
+		AccountID: increase.String(request.AccountID),
+		AtTime:    increase.Null[time.Time](),
+	})
+	if err != nil {
+		var apierr *increase.Error
+		if errors.As(err, &apierr) {
+			return nil, cerr.NewHttpError(apierr.StatusCode, "failed to get account balance", apierr)
+		}
+		return nil, cerr.NewHttpError(503, "failed to get account balance", err)
+	}
+
+	return &GetAccountBalanceResponse{
+		CurrentBalance:   balanceLookup.CurrentBalance,
+		AvailableBalance: balanceLookup.AvailableBalance,
 	}, nil
 }
 
@@ -224,7 +260,32 @@ func (bank *increaseBank) GetTransfer(ctx context.Context, request GetTransferRe
 		AccountNumber: achTransfer.AccountNumber,
 		RoutingNumber: achTransfer.RoutingNumber,
 		TransactionID: achTransfer.TransactionID,
+		Funding:       TransferFunding(achTransfer.Funding),
 		Status:        string(achTransfer.Status),
+	}, nil
+}
+
+// GetTransaction implements Bank.
+func (bank *increaseBank) GetTransaction(ctx context.Context, request GetTransactionRequest) (*Transaction, error) {
+	transaction, err := bank.client.Transactions.Get(ctx, request.ID)
+	if err != nil {
+		var apierr *increase.Error
+		if errors.As(err, &apierr) {
+			return nil, cerr.NewHttpError(apierr.StatusCode, "failed to get transaction", apierr)
+		}
+		return nil, cerr.NewHttpError(503, "failed to get transaction", err)
+	}
+
+	if transaction == nil {
+		return nil, cerr.NewNotFoundError("transaction not found", nil)
+	}
+
+	return &Transaction{
+		ID:          transaction.ID,
+		AccountID:   transaction.AccountID,
+		Amount:      transaction.Amount,
+		Description: transaction.Description,
+		CreatedAt:   transaction.CreatedAt,
 	}, nil
 }
 

@@ -11,30 +11,30 @@
 package openapi
 
 import (
+	"errors"
 	"net/http"
-	"time"
 
-	"github.com/chariot-giving/agapay/pkg/bank"
 	"github.com/chariot-giving/agapay/pkg/cerr"
 	"github.com/gin-gonic/gin"
-	"github.com/increase/increase-go"
 )
 
 // GetAccountBalances - Retrieve account balances
-func GetAccountBalances(c *gin.Context) {
+func (api *openAPIServer) GetAccountBalances(c *gin.Context) {
 	accountId := c.Param("id")
 
-	balanceLookup, err := bank.IncreaseClient.BalanceLookups.Lookup(c, increase.BalanceLookupLookupParams{
-		AccountID: increase.String(accountId),
-		AtTime:    increase.Null[time.Time](),
-	})
+	balanceLookup, err := api.core.Accounts.GetBalance(c, accountId)
 	if err != nil {
-		c.JSON(http.StatusBadGateway, cerr.NewBadGatewayError("error retrieving account balances", err))
+		cErr := new(cerr.HttpError)
+		if errors.As(err, &cErr) {
+			c.Error(cErr)
+			return
+		}
+		c.Error(cerr.NewInternalServerError("failed to retrieve account balance", err))
 		return
 	}
 
 	balance := AccountBalance{
-		AccountId:        balanceLookup.AccountID,
+		AccountId:        accountId,
 		CurrentBalance:   balanceLookup.CurrentBalance,
 		AvailableBalance: balanceLookup.AvailableBalance,
 	}

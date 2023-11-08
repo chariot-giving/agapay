@@ -11,22 +11,27 @@
 package openapi
 
 import (
+	"errors"
 	"net/http"
 	"strconv"
 
 	"github.com/chariot-giving/agapay/pkg/bank"
 	"github.com/chariot-giving/agapay/pkg/cerr"
 	"github.com/gin-gonic/gin"
-	"github.com/increase/increase-go"
 )
 
 // GetTransaction - Retrieve a transaction
-func GetTransaction(c *gin.Context) {
+func (api *openAPIServer) GetTransaction(c *gin.Context) {
 	id := c.Param("id")
 
-	tx, err := bank.IncreaseClient.Transactions.Get(c, id)
+	tx, err := api.core.Transactions.Get(c, id)
 	if err != nil {
-		c.JSON(http.StatusBadGateway, cerr.NewBadGatewayError("error retrieving transaction", err))
+		cErr := new(cerr.HttpError)
+		if errors.As(err, &cErr) {
+			c.Error(cErr)
+			return
+		}
+		c.Error(cerr.NewInternalServerError("failed to retrieve transaction", err))
 		return
 	}
 
@@ -42,7 +47,7 @@ func GetTransaction(c *gin.Context) {
 }
 
 // ListTransactions - List transactions
-func ListTransactions(c *gin.Context) {
+func (api *openAPIServer) ListTransactions(c *gin.Context) {
 	limitQuery := c.DefaultQuery("limit", "100")
 	limit, err := strconv.ParseInt(limitQuery, 10, 64)
 	if err != nil {
@@ -55,26 +60,29 @@ func ListTransactions(c *gin.Context) {
 		return
 	}
 
-	listParams := increase.TransactionListParams{
-		AccountID: increase.String(accountId),
-		Limit:     increase.Int(limit),
+	listParams := bank.ListTransactionsRequest{
+		AccountID: accountId,
+		Limit:     limit,
 	}
 
 	cursor, ok := c.GetQuery("cursor")
 	if ok {
-		listParams.Cursor = increase.String(cursor)
-	} else {
-		listParams.Cursor = increase.Null[string]()
+		listParams.Cursor = cursor
 	}
 
-	response, err := bank.IncreaseClient.Transactions.List(c, listParams)
+	response, err := api.core.Transactions.List(c, listParams)
 	if err != nil {
-		c.JSON(http.StatusBadGateway, cerr.NewBadGatewayError("error retrieving transactions", err))
+		cErr := new(cerr.HttpError)
+		if errors.As(err, &cErr) {
+			c.Error(cErr)
+			return
+		}
+		c.Error(cerr.NewInternalServerError("failed to list transaction", err))
 		return
 	}
 
-	transactions := make([]Transaction, len(response.Data))
-	for i, tx := range response.Data {
+	transactions := make([]Transaction, len(response.Transactions))
+	for i, tx := range response.Transactions {
 		transactions[i] = Transaction{
 			Id:          tx.ID,
 			AccountId:   tx.AccountID,
@@ -87,7 +95,7 @@ func ListTransactions(c *gin.Context) {
 	transactionList := TransactionList{
 		Data: transactions,
 		Paging: Pagination{
-			Total: int32(len(response.Data)),
+			Total: int32(len(response.Transactions)),
 			Cursors: PaginationCursors{
 				Before: cursor,
 				After:  response.NextCursor,

@@ -4,11 +4,18 @@ import (
 	"context"
 
 	"github.com/chariot-giving/agapay/pkg/atomic"
-	"go.uber.org/zap"
 )
 
-func (s *AgapayServer) UpsertIdempotencyKey(ctx context.Context, request *atomic.IdempotentRequest) (*atomic.IdempotencyKey, error) {
-	logger := ctx.Value("logger").(*zap.Logger)
-	adb := atomic.NewAtomicDatabaseHandle(s.db, logger)
-	return adb.UpsertIdempotencyKey(request)
+type idempotencyHandler struct {
+	adb *atomic.AtomicDatabaseHandle
+}
+
+func newIdempotencyHandler(adb *atomic.AtomicDatabaseHandle) *idempotencyHandler {
+	return &idempotencyHandler{
+		adb: adb,
+	}
+}
+
+func (h *idempotencyHandler) UpsertIdempotencyKey(ctx context.Context, request *atomic.IdempotentRequest) (*atomic.IdempotencyKey, error) {
+	return h.adb.UpsertIdempotencyKey(request)
 }

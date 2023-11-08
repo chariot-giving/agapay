@@ -140,6 +140,8 @@ model organization {
 model recipient {
   // The unique identifier of the recipient
   id                 String       @id @default(uuid()) @db.Uuid
+  // The name of the recipient
+  name              String       @db.VarChar(255)
   // a flag to indicate if the recipient is a primary recipient for an organization
   // there should only ever be one primary recipient for any organization
   primary            Boolean      @default(false)
@@ -152,6 +154,8 @@ model recipient {
   // the identifier of the mailing address for the recipient
   mailing_address_id BigInt       @db.BigInt
   mailingAddress     address      @relation(fields: [mailing_address_id], references: [id], onDelete: Cascade, onUpdate: Cascade, map: "fk_recipient_mailing_address")
+  // the time the recipient was created
+  created_at         DateTime         @default(now()) @db.Timestamptz(6)
   payment            payment[]
 
   @@index([organization_id], map: "idx_recipient_organization_id")
@@ -165,12 +169,11 @@ model payment {
   amount             BigInt           @db.BigInt
   // description of the payment
   description        String           @db.VarChar(400)
-  // identifier of the ACH transfer
-  // null until the ACH transfer is created
-  ach_transfer_id    String?          @db.VarChar(255)
-  // identifier of the RTP transfer
-  // null until the RTP transfer is created
-  rpt_transfer_id    String?          @db.VarChar(255)
+  // the payment rail used to send the payment
+  payment_rail      payment_rail
+  // identifier of the bank transfer
+  // null until the bank transfer is created
+  bank_transfer_id    String?          @db.VarChar(255)
   // the identifier of the account that originated this payment
   account_id         BigInt           @db.BigInt
   account            account          @relation(fields: [account_id], references: [id], onDelete: Cascade, onUpdate: Cascade, map: "fk_payment_account")
@@ -204,6 +207,10 @@ model transfer {
   amount             BigInt           @db.BigInt
   // description of the transfer
   description        String           @db.VarChar(400)
+  // the destination account number
+  account_number String @db.VarChar(255)
+  // the destination routing number
+  routing_number String @db.VarChar(255)
   // identifier of the ACH transfer
   // null until the ACH transfer is created
   ach_transfer_id    String?          @db.VarChar(255)
@@ -265,6 +272,11 @@ model bank_address {
   recipient      recipient[]
 
   @@index([routing_number, account_number], map: "idx_bank_address_routing_number_account_number")
+}
+
+enum payment_rail {
+  ach
+  rtp
 }
 
 enum address_status {

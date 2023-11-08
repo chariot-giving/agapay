@@ -5,13 +5,17 @@ import "gorm.io/datatypes"
 type AuditRecordResourceType string
 
 const (
-	AuditRecordResourceTypeAccount AuditRecordResourceType = "account"
+	AuditRecordResourceTypeAccount  AuditRecordResourceType = "account"
+	AuditRecordResourceTypeTransfer AuditRecordResourceType = "transfer"
+	AuditRecordResourceTypePayment  AuditRecordResourceType = "payment"
 )
 
 type AuditRecordAction string
 
 const (
-	AuditRecordActionCreateAccount AuditRecordAction = "create_account"
+	AuditRecordActionCreateAccount  AuditRecordAction = "create_account"
+	AuditRecordActionCreateTransfer AuditRecordAction = "create_transfer"
+	AuditRecordActionCreatePayment  AuditRecordAction = "create_payment"
 )
 
 type AuditRecord struct {

@@ -10,6 +10,10 @@
 
 package openapi
 
+import (
+	"time"
+)
+
 // Payment - A payment moves funds from a Chariot account to a verified nonprofit recipient.
 type Payment struct {
 
@@ -36,4 +40,7 @@ type Payment struct {
 
 	// The status of the payment
 	Status string `json:"status,omitempty"`
+
+	// The date and time the payment was created
+	CreatedAt time.Time `json:"created_at,omitempty"`
 }

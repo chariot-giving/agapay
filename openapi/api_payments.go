@@ -11,215 +11,163 @@
 package openapi
 
 import (
+	"errors"
 	"net/http"
 	"strconv"
 
-	"github.com/chariot-giving/agapay/pkg/bank"
+	"github.com/chariot-giving/agapay/pkg/atomic"
+	"github.com/chariot-giving/agapay/pkg/auth"
 	"github.com/chariot-giving/agapay/pkg/cerr"
-	"github.com/chariot-giving/agapay/pkg/network"
+	"github.com/chariot-giving/agapay/pkg/core"
 	"github.com/gin-gonic/gin"
-	"github.com/increase/increase-go"
+	"github.com/google/uuid"
+	"go.uber.org/zap"
 )
 
 // CreatePayment - Create a payment
-func CreatePayment(c *gin.Context) {
+func (api *openAPIServer) CreatePayment(c *gin.Context) {
+	logger := c.Value("logger").(*zap.Logger)
+
 	payment := new(Payment)
-	if err := c.ShouldBindJSON(payment); err != nil {
-		c.JSON(http.StatusBadRequest, cerr.NewBadRequest("invalid request body", err))
-		return
-	}
-
-	// get payee
-	electronicAccount, err := network.PayeeDB.GetPayeeElectronicAccount(payment.RecipientId)
+	err := c.Bind(payment)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, cerr.NewInternalServerError("error retrieving payee", err))
+		c.Error(cerr.NewBadRequest("invalid request body", err))
 		return
 	}
 
-	// find out how to pay this address based on routing numbers
-	routingNumberResponse, err := bank.IncreaseClient.RoutingNumbers.List(c, increase.RoutingNumberListParams{
-		RoutingNumber: increase.String(electronicAccount.RoutingNumber),
-	})
+	idempotencyKey := c.GetHeader("Idempotency-Key")
+	if idempotencyKey == "" {
+		idempotencyKey = uuid.NewString()
+	}
+	c.Header("Idempotency-Key", idempotencyKey)
+
+	logger.Info("creating payment", zap.String("idempotency_key", idempotencyKey))
+
+	params := make(map[string]string)
+	for _, v := range c.Params {
+		params[v.Key] = v.Value
+	}
+	request := &atomic.IdempotentRequest{
+		UserId:         auth.UserId(c),
+		IdempotencyKey: idempotencyKey,
+		Method:         c.Request.Method,
+		Path:           c.Request.URL.Path,
+		Params:         params,
+		Body:           payment,
+	}
+
+	accountId, err := strconv.ParseUint(payment.AccountId, 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadGateway, cerr.NewBadGatewayError("error retrieving routing number", err))
+		c.Error(cerr.NewBadRequest("invalid account_id", err))
+		return
+	}
+	recipientId, err := strconv.ParseUint(payment.RecipientId, 10, 64)
+	if err != nil {
+		c.Error(cerr.NewBadRequest("invalid recipient_id", err))
+		return
+	}
+	createPayment := core.CreatePaymentRequest{
+		AccountID:   accountId,
+		Description: payment.Description,
+		Amount:      payment.Amount,
+		RecipientID: recipientId,
+	}
+
+	key, err := api.core.Payments.Create(c, request, &createPayment)
+	if err != nil {
+		cErr := new(cerr.HttpError)
+		if errors.As(err, &cErr) {
+			c.Error(cErr)
+			return
+		}
+		c.Error(cerr.NewInternalServerError("failed to create payment", err))
 		return
 	}
 
-	if len(routingNumberResponse.Data) == 0 {
-		c.JSON(http.StatusNotFound, cerr.NewNotFoundError("routing number not found", nil))
-		return
-	}
-
-	destinationBank := routingNumberResponse.Data[0]
-	if destinationBank.RealTimePaymentsTransfers == increase.RoutingNumberRealTimePaymentsTransfersSupported {
-		// resolve the originating account number
-		accountNumbers, err := bank.IncreaseClient.AccountNumbers.List(c, increase.AccountNumberListParams{
-			AccountID: increase.String(payment.AccountId),
-			Status:    increase.F[increase.AccountNumberListParamsStatus](increase.AccountNumberListParamsStatusActive),
-		})
-		if err != nil {
-			c.JSON(http.StatusBadRequest, cerr.NewBadRequest("error retrieving account numbers", err))
-			return
-		}
-
-		if len(accountNumbers.Data) == 0 {
-			c.JSON(http.StatusNotFound, cerr.NewBadRequest("no account numbers found", nil))
-			return
-		}
-		accountNumberId := accountNumbers.Data[0].ID
-
-		// use RTP
-		transfer, err := bank.IncreaseClient.RealTimePaymentsTransfers.New(c, increase.RealTimePaymentsTransferNewParams{
-			CreditorName:             increase.String(electronicAccount.Name),
-			Amount:                   increase.Int(payment.Amount),
-			RemittanceInformation:    increase.String(payment.Description),
-			SourceAccountNumberID:    increase.String(accountNumberId),
-			DestinationAccountNumber: increase.String(electronicAccount.AccountNumber),
-			DestinationRoutingNumber: increase.String(electronicAccount.RoutingNumber),
-			RequireApproval:          increase.Bool(false),
-		})
-		if err != nil {
-			c.JSON(http.StatusBadGateway, cerr.NewBadGatewayError("error creating RTP transfer", err))
-			return
-		}
-
-		payment.Id = transfer.ID
-		payment.TransactionId = transfer.TransactionID
-		payment.Status = string(transfer.Status)
-	} else if destinationBank.ACHTransfers == increase.RoutingNumberACHTransfersSupported {
-		// use ACH
-		transfer, err := bank.IncreaseClient.ACHTransfers.New(c, increase.ACHTransferNewParams{
-			AccountID:           increase.String(payment.AccountId),
-			Amount:              increase.Int(payment.Amount),
-			StatementDescriptor: increase.String(payment.Description),
-			AccountNumber:       increase.String(electronicAccount.AccountNumber),
-			RoutingNumber:       increase.String(electronicAccount.RoutingNumber),
-			RequireApproval:     increase.Bool(false),
-		})
-		if err != nil {
-			c.JSON(http.StatusBadGateway, cerr.NewBadGatewayError("error creating ACH transfer", err))
-			return
-		}
-
-		payment.Id = transfer.ID
-		payment.TransactionId = transfer.TransactionID
-		payment.Status = string(transfer.Status)
-	} else {
-		// TODO: fallback to sending a check or fail the request??
-		c.JSON(http.StatusBadRequest, cerr.NewBadRequest("destination account does not support RTP or ACH transfers", nil))
-		return
-	}
-
-	c.Header("Location", "/payments/"+payment.Id)
-	c.JSON(http.StatusOK, payment)
+	c.JSON(key.ResponseCode, key.ResponseBody)
 }
 
 // GetPayment - Retrieve a payment
-func GetPayment(c *gin.Context) {
+func (api *openAPIServer) GetPayment(c *gin.Context) {
 	id := c.Param("id")
 
-	// TODO: do we want to check RTP and then fallback to ACH or should we be explicit about the payment type?
-	rtpTransfer, err := bank.IncreaseClient.RealTimePaymentsTransfers.Get(c, id)
+	payment, err := api.core.Payments.Get(c, id)
 	if err != nil {
-		c.JSON(http.StatusBadGateway, cerr.NewBadGatewayError("error retrieving RTP transfer", err))
+		cErr := new(cerr.HttpError)
+		if errors.As(err, &cErr) {
+			c.Error(cErr)
+			return
+		}
+		c.Error(cerr.NewInternalServerError("failed to retrieve payment", err))
 		return
 	}
 
-	if rtpTransfer == nil {
-		achTransfer, err := bank.IncreaseClient.ACHTransfers.Get(c, id)
-		if err != nil {
-			c.JSON(http.StatusBadGateway, cerr.NewBadGatewayError("error retrieving ACH transfer", err))
-			return
-		}
-
-		if achTransfer == nil {
-			c.JSON(http.StatusNotFound, cerr.NewNotFoundError("ACH transfer not found", nil))
-			return
-		}
-
-		// TODO: source recipient + chariot ID from database
-		payment := Payment{
-			Id:            achTransfer.ID,
-			AccountId:     achTransfer.AccountID,
-			Amount:        achTransfer.Amount,
-			Description:   achTransfer.StatementDescriptor,
-			TransactionId: achTransfer.TransactionID,
-			Status:        string(achTransfer.Status),
-			RecipientId:   "",
-			ChariotId:     "",
-		}
-
-		c.JSON(http.StatusOK, &payment)
-	}
-
-	// TODO: source recipient + chariot ID from database
-	payment := Payment{
-		Id:            rtpTransfer.ID,
-		AccountId:     rtpTransfer.AccountID,
-		Amount:        rtpTransfer.Amount,
-		Description:   rtpTransfer.RemittanceInformation,
-		TransactionId: rtpTransfer.TransactionID,
-		Status:        string(rtpTransfer.Status),
-		RecipientId:   "",
-		ChariotId:     "",
-	}
-
-	c.JSON(http.StatusOK, &payment)
+	c.JSON(http.StatusOK, &Payment{
+		Id:            strconv.FormatUint(payment.Payment.Id, 10),
+		AccountId:     strconv.FormatUint(payment.Payment.AccountId, 10),
+		Description:   payment.Payment.Description,
+		Amount:        int64(payment.Payment.Amount),
+		RecipientId:   strconv.FormatUint(payment.Payment.RecipientId, 10),
+		TransactionId: payment.BankPayment.TransactionID,
+		Status:        payment.BankPayment.Status,
+	})
 }
 
 // ListPayments - List payments
-// TODO: reconcile different payment types and merging them into a single list - not ideal
-func ListPayments(c *gin.Context) {
+func (api *openAPIServer) ListPayments(c *gin.Context) {
 	limitQuery := c.DefaultQuery("limit", "100")
-	limit, err := strconv.ParseInt(limitQuery, 10, 64)
+	limit, err := strconv.Atoi(limitQuery)
 	if err != nil {
 		limit = 100
 	}
 
-	accountId, ok := c.GetQuery("account_id")
-	if !ok {
-		c.JSON(http.StatusBadRequest, cerr.NewBadRequest("account_id is required", nil))
+	accountId := c.GetUint64("account_id")
+	if accountId == 0 {
+		c.Error(cerr.NewBadRequest("account_id is required", nil))
+		c.Abort()
 		return
 	}
 
-	listParams := increase.RealTimePaymentsTransferListParams{
-		AccountID: increase.String(accountId),
-		Limit:     increase.Int(limit),
+	recipientId := c.GetUint64("recipient_id")
+
+	listParams := core.ListPaymentsRequest{
+		UserID:      auth.UserId(c),
+		AccountID:   accountId,
+		RecipientID: recipientId,
+		Limit:       limit,
 	}
 
 	cursor, ok := c.GetQuery("cursor")
 	if ok {
-		listParams.Cursor = increase.String(cursor)
-	} else {
-		listParams.Cursor = increase.Null[string]()
+		listParams.Cursor = cursor
 	}
 
-	// TODO: filter by recipient ID in our database first
-	// recipientId := c.DefaultQuery("recipient_id", "")
-	response, err := bank.IncreaseClient.RealTimePaymentsTransfers.List(c, listParams)
+	response, err := api.core.Payments.List(c, listParams)
 	if err != nil {
-		c.JSON(http.StatusBadGateway, cerr.NewBadGatewayError("error retrieving RTP transfers", err))
+		cErr := new(cerr.HttpError)
+		if errors.As(err, &cErr) {
+			c.Error(cErr)
+			return
+		}
+		c.Error(cerr.NewInternalServerError("failed to list payments", err))
 		return
 	}
 
-	payments := make([]Payment, len(response.Data))
-	for i, transfer := range response.Data {
+	payments := make([]Payment, len(response.Payments))
+	for i, payment := range response.Payments {
 		payments[i] = Payment{
-			Id:            transfer.ID,
-			AccountId:     transfer.AccountID,
-			Amount:        transfer.Amount,
-			Description:   transfer.RemittanceInformation,
-			TransactionId: transfer.TransactionID,
-			Status:        string(transfer.Status),
-			RecipientId:   "",
-			ChariotId:     "",
+			Id:          strconv.FormatUint(payment.Id, 10),
+			AccountId:   strconv.FormatUint(payment.AccountId, 10),
+			Description: payment.Description,
+			Amount:      int64(payment.Amount),
+			CreatedAt:   *payment.CreatedAt,
 		}
 	}
 
 	paymentList := PaymentList{
 		Data: payments,
 		Paging: Pagination{
-			Total: int32(len(response.Data)),
+			Total: int32(len(response.Payments)),
 			Cursors: PaginationCursors{
 				Before: cursor,
 				After:  response.NextCursor,
