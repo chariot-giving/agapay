@@ -11,14 +11,15 @@
 package openapi
 
 import (
-	"log"
 	"net/http"
-	"os"
 
 	"github.com/chariot-giving/agapay/pkg/auth"
 	"github.com/chariot-giving/agapay/pkg/cerr"
+	"github.com/chariot-giving/agapay/pkg/core"
 	"github.com/chariot-giving/agapay/pkg/logger"
+	"github.com/chariot-giving/agapay/pkg/telemetry"
 	"github.com/gin-gonic/gin"
+	"go.uber.org/zap"
 )
 
 // Route is the information for every URI.
@@ -37,30 +38,24 @@ type Route struct {
 type Routes []Route
 
 // NewRouter returns a new router.
-func NewRouter() *gin.Engine {
+func NewRouter(server *core.AgapayServer) *gin.Engine {
 	router := gin.Default()
 	router.NoRoute(func(c *gin.Context) {
 		c.Error(cerr.NewNotFoundError("route not found", nil))
+		c.Abort()
+		return
 	})
-
-	logLevel := os.Getenv("LOG_LEVEL")
-	if logLevel == "" {
-		logLevel = "info"
-	}
-	zapLogger, err := logger.Init(logLevel, "2006-01-02 15:04:05.000 MST")
-	if err != nil {
-		log.Fatalf("failed to initialize logger: %v", err)
-	}
-	defer logger.Flush() // flushes buffer on exit
 
 	// add middleware
 	middlewares := []gin.HandlerFunc{
-		logger.RequestIDMiddleware(),
-		logger.LoggingMiddleware(zapLogger),
+		telemetry.RequestIDMiddleware(),
+		logger.LoggingMiddleware(zap.L()),
 		auth.ApiKeyAuth(),
 		cerr.ErrorHandler(),
 	}
 	router.Use(middlewares...)
+
+	// TODO: add routes
 
 	for _, route := range routes {
 		switch route.Method {

@@ -1,4 +1,4 @@
-package adb
+package atomic
 
 type RecoveryPoint string
 

@@ -15,10 +15,11 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/chariot-giving/agapay/pkg/adb"
+	"github.com/chariot-giving/agapay/pkg/atomic"
 	"github.com/chariot-giving/agapay/pkg/auth"
 	"github.com/chariot-giving/agapay/pkg/bank"
 	"github.com/chariot-giving/agapay/pkg/cerr"
+	"github.com/chariot-giving/agapay/pkg/core"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/increase/increase-go"
@@ -26,7 +27,7 @@ import (
 )
 
 // CreateAccount - Create an account
-func CreateAccount(c *gin.Context) {
+func (api *OpenAPIServer) CreateAccount(c *gin.Context) {
 	logger := c.Value("logger").(*zap.Logger)
 
 	requestBody := new(Account)
@@ -48,7 +49,7 @@ func CreateAccount(c *gin.Context) {
 	for _, v := range c.Params {
 		params[v.Key] = v.Value
 	}
-	request := &adb.IdempotentRequest{
+	request := &atomic.IdempotentRequest{
 		UserId:         auth.UserId(c),
 		IdempotencyKey: idempotencyKey,
 		Method:         c.Request.Method,
@@ -56,7 +57,7 @@ func CreateAccount(c *gin.Context) {
 		Params:         params,
 		Body:           requestBody,
 	}
-	key, err := adb.AgapayDatabase.UpsertIdempotencyKey(request)
+	key, err := api.core.UpsertIdempotencyKey(c, request)
 	if err != nil {
 		cErr := new(cerr.HttpError)
 		if errors.As(err, &cErr) {
@@ -69,19 +70,19 @@ func CreateAccount(c *gin.Context) {
 
 	logger.Info("idempotency key upserted", zap.String("idempotency_key", idempotencyKey))
 
-	account := new(adb.Account)
+	account := new(core.Account)
 
 	// start the state machine
 	for {
 		switch key.RecoveryPoint {
-		case adb.RecoveryPointStarted:
+		case atomic.RecoveryPointStarted:
 			// create the account
-			account = &adb.Account{
+			account = &core.Account{
 				IdempotencyKeyId: key.Id,
 				UserId:           strconv.FormatUint(key.UserId, 10),
 				Name:             requestBody.Name,
 			}
-			_, err := adb.AgapayDatabase.CreateAccount(c, key, account)
+			_, err := api.core.CreateAccount(c, key, account)
 			if err != nil {
 				cErr := new(cerr.HttpError)
 				if errors.As(err, &cErr) {
@@ -91,9 +92,9 @@ func CreateAccount(c *gin.Context) {
 				c.Error(cerr.NewInternalServerError("failed to create account", err))
 				return
 			}
-		case adb.RecoveryPointAccountCreated:
+		case atomic.RecoveryPointAccountCreated:
 			// create the bank account
-			_, err := adb.AgapayDatabase.CreateBankAccount(c, key, account)
+			_, err := api.core.CreateBankAccount(c, key, account)
 			if err != nil {
 				cErr := new(cerr.HttpError)
 				if errors.As(err, &cErr) {
@@ -103,9 +104,9 @@ func CreateAccount(c *gin.Context) {
 				c.Error(cerr.NewInternalServerError("failed to create bank account", err))
 				return
 			}
-		case adb.RecoveryPointBankAccountCreated:
+		case atomic.RecoveryPointBankAccountCreated:
 			// create the bank account number
-			_, err := adb.AgapayDatabase.CreateBankAccountNumber(c, key, account)
+			_, err := api.core.CreateBankAccountNumber(c, key, account)
 			if err != nil {
 				cErr := new(cerr.HttpError)
 				if errors.As(err, &cErr) {
@@ -115,7 +116,7 @@ func CreateAccount(c *gin.Context) {
 				c.Error(cerr.NewInternalServerError("failed to create bank account number", err))
 				return
 			}
-		case adb.RecoveryPointFinished:
+		case atomic.RecoveryPointFinished:
 			// we're done
 		default:
 			c.Error(cerr.NewInternalServerError("bug: unknown recovery point", nil))
@@ -123,7 +124,7 @@ func CreateAccount(c *gin.Context) {
 		}
 
 		// if we're done, break out of the loop
-		if key.RecoveryPoint == adb.RecoveryPointFinished {
+		if key.RecoveryPoint == atomic.RecoveryPointFinished {
 			break
 		}
 	}
@@ -132,10 +133,10 @@ func CreateAccount(c *gin.Context) {
 }
 
 // GetAccount - Retrieve an account
-func GetAccount(c *gin.Context) {
+func (api *OpenAPIServer) GetAccount(c *gin.Context) {
 	id := c.Param("id")
 
-	account, err := adb.AgapayDatabase.GetAccount(c, id)
+	account, err := api.core.GetAccount(c, id)
 	if err != nil {
 		cErr := new(cerr.HttpError)
 		if errors.As(err, &cErr) {
@@ -150,7 +151,7 @@ func GetAccount(c *gin.Context) {
 }
 
 // GetAccountDetails - Retrieve account details
-func GetAccountDetails(c *gin.Context) {
+func (api *OpenAPIServer) GetAccountDetails(c *gin.Context) {
 	id := c.Param("id")
 
 	bankAccount, err := bank.IncreaseClient.Accounts.Get(c, id)

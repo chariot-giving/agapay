@@ -1,6 +1,6 @@
-.PHONY: all golang-build yarn-install golang-test yarn-test test clean
+.PHONY: all golang-build yarn-install yarn-build golang-test yarn-test test clean
 
-all: golang-install golang-build yarn-install
+all: golang-install golang-build yarn-install yarn-build
 
 golang-install:
 	@echo "Ensuring Golang dependencies..."
@@ -13,6 +13,10 @@ golang-build: golang-install
 yarn-install:
 	@echo "Installing yarn dependencies..."
 	yarn
+
+yarn-build: yarn-install
+	@echo "Building yarn application..."
+	yarn build
 
 golang-test: golang-install
 	@echo "Running Golang tests..."

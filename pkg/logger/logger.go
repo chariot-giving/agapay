@@ -87,7 +87,3 @@ func Init(lvl string, timeFormat string) (*zap.Logger, error) {
 
 	return log, err
 }
-
-func Flush() error {
-	return log.Sync()
-}

@@ -1,4 +1,4 @@
-package adb
+package atomic
 
 import (
 	"database/sql"
@@ -18,7 +18,7 @@ import (
 // which is most likely the case whenever we need to make a foreign state mutation (e.g. a payment).
 // An atomic phase is a set of local state mutations that occur in transactions between foreign state mutations.
 // So if you're not mutating foreign state, you probably don't need this.
-func (db *AgapayDB) AtomicPhase(key *IdempotencyKey, fn TransactionFunc) error {
+func (db *AtomicDatabaseHandle) AtomicPhase(key *IdempotencyKey, fn TransactionFunc) error {
 	err := db.Transaction(func(tx *gorm.DB) error {
 		result, err := fn(tx)
 		if err != nil {
