@@ -18,7 +18,7 @@ func NewAgapayServer(db *gorm.DB, bank bank.Bank) *AgapayServer {
 	return &AgapayServer{
 		Accounts:     newAccountsService(db, bank),
 		Recipients:   newRecipientsService(db),
-		Transactions: newTransactionService(bank),
+		Transactions: newTransactionService(db, bank),
 		Transfers:    newTransfersService(db, bank),
 		Payments:     newPaymentsService(db, bank),
 		db:           db,

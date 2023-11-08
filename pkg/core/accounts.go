@@ -270,8 +270,16 @@ type ListAccountsResponse struct {
 }
 
 func (s *AccountsService) GetDetails(ctx context.Context, id string) (*AccountDetails, error) {
+	account, err := s.Get(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	if account.BankAccountId == nil {
+		return nil, cerr.NewNotFoundError("bank account not found", nil)
+	}
+
 	details, err := s.bank.GetAccountDetails(ctx, bank.GetAccountDetailsRequest{
-		AccountID: id,
+		AccountID: *account.BankAccountId,
 	})
 	if err != nil {
 		return nil, err
@@ -284,8 +292,16 @@ func (s *AccountsService) GetDetails(ctx context.Context, id string) (*AccountDe
 }
 
 func (s *AccountsService) GetBalance(ctx context.Context, id string) (*AccountBalance, error) {
+	account, err := s.Get(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	if account.BankAccountId == nil {
+		return nil, cerr.NewNotFoundError("bank account not found", nil)
+	}
+
 	balanceLookup, err := s.bank.GetAccountBalance(ctx, bank.GetAccountBalanceRequest{
-		AccountID: id,
+		AccountID: *account.BankAccountId,
 	})
 	if err != nil {
 		return nil, err

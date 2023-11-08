@@ -56,8 +56,8 @@ func (s *PaymentsService) List(ctx context.Context, req ListPaymentsRequest) (*L
 	if req.AccountID != 0 {
 		query = query.Where("account_id = ?", req.AccountID)
 	}
-	if req.AccountID != 0 {
-		query = query.Where("recipient_id = ?", req.AccountID)
+	if req.RecipientID != 0 {
+		query = query.Where("recipient_id = ?", req.RecipientID)
 	}
 	if req.Limit > 0 {
 		query = query.Limit(req.Limit)

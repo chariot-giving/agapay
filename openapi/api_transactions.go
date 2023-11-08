@@ -15,8 +15,8 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/chariot-giving/agapay/pkg/bank"
 	"github.com/chariot-giving/agapay/pkg/cerr"
+	"github.com/chariot-giving/agapay/pkg/core"
 	"github.com/gin-gonic/gin"
 )
 
@@ -54,13 +54,19 @@ func (api *openAPIServer) ListTransactions(c *gin.Context) {
 		limit = 100
 	}
 
-	accountId, ok := c.GetQuery("account_id")
+	accountIdQuery, ok := c.GetQuery("account_id")
 	if !ok {
 		c.JSON(http.StatusBadRequest, cerr.NewBadRequest("account_id is required", nil))
 		return
 	}
 
-	listParams := bank.ListTransactionsRequest{
+	accountId, err := strconv.ParseUint(accountIdQuery, 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, cerr.NewBadRequest("account_id is invalid", nil))
+		return
+	}
+
+	listParams := core.ListTransactionsRequest{
 		AccountID: accountId,
 		Limit:     limit,
 	}

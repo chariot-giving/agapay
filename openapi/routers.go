@@ -39,9 +39,7 @@ type Routes []Route
 func NewRouter(server *core.AgapayServer) *gin.Engine {
 	router := gin.Default()
 	router.NoRoute(func(c *gin.Context) {
-		c.Error(cerr.NewNotFoundError("route not found", nil))
-		c.Abort()
-		return
+		c.JSON(404, cerr.NewNotFoundError("route not found", nil))
 	})
 
 	// add middleware

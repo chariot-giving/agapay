@@ -25,7 +25,6 @@ func (api *openAPIServer) CreateRecipient(c *gin.Context) {
 	request := new(CreateRecipientRequest)
 	if err := c.ShouldBindJSON(request); err != nil {
 		c.Error(cerr.NewBadRequest("invalid request body", err))
-		c.Abort()
 		return
 	}
 

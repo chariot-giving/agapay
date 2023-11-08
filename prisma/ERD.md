@@ -52,17 +52,19 @@ erDiagram
 }
 "recipient" {
     String id PK
+    String name
     Boolean primary
     String organization_id FK
     BigInt bank_address_id FK
     BigInt mailing_address_id FK
+    DateTime created_at
 }
 "payment" {
     BigInt id PK
     BigInt amount
     String description
-    String ach_transfer_id "nullable"
-    String rpt_transfer_id "nullable"
+    payment_rail payment_rail
+    String bank_transfer_id "nullable"
     BigInt account_id FK
     String recipient_id FK
     String chariot_id "nullable"
@@ -74,6 +76,8 @@ erDiagram
     BigInt id PK
     BigInt amount
     String description
+    String account_number
+    String routing_number
     String ach_transfer_id "nullable"
     BigInt account_id FK
     BigInt idempotency_key_id FK "nullable"
@@ -172,10 +176,12 @@ erDiagram
 
 **Properties**
   - `id`: 
+  - `name`: 
   - `primary`: 
   - `organization_id`: 
   - `bank_address_id`: 
   - `mailing_address_id`: 
+  - `created_at`: 
 
 ### `payment`
 
@@ -183,8 +189,8 @@ erDiagram
   - `id`: 
   - `amount`: 
   - `description`: 
-  - `ach_transfer_id`: 
-  - `rpt_transfer_id`: 
+  - `payment_rail`: 
+  - `bank_transfer_id`: 
   - `account_id`: 
   - `recipient_id`: 
   - `chariot_id`: 
@@ -198,6 +204,8 @@ erDiagram
   - `id`: 
   - `amount`: 
   - `description`: 
+  - `account_number`: 
+  - `routing_number`: 
   - `ach_transfer_id`: 
   - `account_id`: 
   - `idempotency_key_id`: 

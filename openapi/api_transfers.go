@@ -61,10 +61,14 @@ func (api *openAPIServer) ListTransfers(c *gin.Context) {
 		limit = 100
 	}
 
-	accountId := c.GetUint64("account_id")
-	if accountId == 0 {
+	accountIdQuery, ok := c.GetQuery("account_id")
+	if !ok {
 		c.Error(cerr.NewBadRequest("account_id is required", nil))
-		c.Abort()
+		return
+	}
+	accountId, err := strconv.ParseUint(accountIdQuery, 10, 64)
+	if err != nil {
+		c.Error(cerr.NewBadRequest("account_id parameter is malformed", err))
 		return
 	}
 

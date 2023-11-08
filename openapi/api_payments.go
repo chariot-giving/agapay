@@ -121,14 +121,27 @@ func (api *openAPIServer) ListPayments(c *gin.Context) {
 		limit = 100
 	}
 
-	accountId := c.GetUint64("account_id")
-	if accountId == 0 {
+	accountIdQuery, ok := c.GetQuery("account_id")
+	if !ok {
 		c.Error(cerr.NewBadRequest("account_id is required", nil))
-		c.Abort()
+		return
+	}
+	accountId, err := strconv.ParseUint(accountIdQuery, 10, 64)
+	if err != nil {
+		c.Error(cerr.NewBadRequest("account_id parameter is malformed", err))
 		return
 	}
 
-	recipientId := c.GetUint64("recipient_id")
+	var recipientId uint64
+	recipientIdQuery, ok := c.GetQuery("recipient_id")
+	if ok {
+		result, err := strconv.ParseUint(recipientIdQuery, 10, 64)
+		if err != nil {
+			c.Error(cerr.NewBadRequest("recipient_id parameter is malformed", err))
+			return
+		}
+		recipientId = result
+	}
 
 	listParams := core.ListPaymentsRequest{
 		UserID:      auth.UserId(c),
