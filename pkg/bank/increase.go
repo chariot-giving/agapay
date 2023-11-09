@@ -168,9 +168,8 @@ func (bank *increaseBank) GetAccountDetails(ctx context.Context, request GetAcco
 
 // GetAccountBalance implements Bank.
 func (bank *increaseBank) GetAccountBalance(ctx context.Context, request GetAccountBalanceRequest) (*GetAccountBalanceResponse, error) {
-	balanceLookup, err := bank.client.BalanceLookups.Lookup(ctx, increase.BalanceLookupLookupParams{
-		AccountID: increase.String(request.AccountID),
-		AtTime:    increase.Null[time.Time](),
+	balanceLookup, err := bank.client.Accounts.Balance(ctx, request.AccountID, increase.AccountBalanceParams{
+		AtTime: increase.Null[time.Time](),
 	})
 	if err != nil {
 		var apierr *increase.Error

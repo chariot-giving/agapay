@@ -24,7 +24,7 @@ In a sense, that's exactly what `Agapay` does.
 
 ## How it works
 
-## For the Recipients
+### For the Recipients
 
 Nonprofit entities are the recipients in the `Agapay` network.
 
@@ -44,7 +44,7 @@ Recipients can select their preferred payment method for each `Chariot` hosted `
 
 ![Recipient Onboarding Flow](./docs/assets/recipient_onboarding_flow.png)
 
-## For the Payers
+### For the Payers
 
 Payers are the individuals or organizations that send payments to the recipients in the `Agapay` network.
 
@@ -134,3 +134,54 @@ curl -H "Authorization: Bearer chariot123" http://localhost:8088/recipients | jq
   }
 }
 ```
+
+## API Reference
+
+### Authorization
+
+The API accepts [Bearer Authentication](https://datatracker.ietf.org/doc/html/rfc6750).
+When you sign up for a Chariot account, we make you a pair of API keys:
+one for production and one for our sandbox environment in which no real money moves.
+You can create and revoke API keys from the dashboard and should securely store them using a secret management system.
+
+### OpenAPI
+
+The `Agapay` API is documented using [OpenAPI](./api/openapi.yaml).
+This spec is in beta and subject to change. If you find it useful, or have feedback, let us know!
+
+### Errors
+
+The API uses standard HTTP response codes to indicate the success or failure of requests.
+Codes in the 2xx range indicate success; codes in the 4xx and 5xx range indicate errors.
+Error objects conform to [RFC 7807](https://datatracker.ietf.org/doc/html/rfc7807) and can be distinguished by their type attribute.
+Errors will always have the same shape.
+
+```json
+{
+  "status": 400,
+  "type": "Bad Request",
+  "title": "failed to create bank account",
+  "detail": "your request contains invalid parameters: the name must be at least 3 characters long",
+}
+```
+
+### Idempotency
+
+The API supports idempotency for safely retrying requests without accidentally performing the same operation twice.
+This is useful when an API call is disrupted in transit and you do not receive a response.
+For example, if a request to create a payment does not respond due to a network connection error,
+you can retry the request with the same idempotency key to guarantee that no more than one payment is created.
+
+To perform an idempotent request, provide an additional, unique `Idempotency-Key` request header per intended request.
+We recommend using a V4 UUID. Reusing the key in subsequent requests will return the same response code and body as
+the original request along with an additional HTTP header (Idempotent-Replayed: true).
+This applies to both success and error responses.
+In situations where your request results in a validation error,
+you'll need to update your request and retry with a new idempotency key.
+
+Idempotency keys will persist in the API for at least 1 hour.
+If an original request is still being processed when an idempotency key is reused, the API will return a
+[409 Conflict](https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/409) error.
+Subsequent requests must be identical to the original request or the API will return a
+[422 Unprocessable Entity](https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/422) error.
+We discourage setting an idempotency key on `GET` and `DELETE` requests as these requests are inherently idempotent.

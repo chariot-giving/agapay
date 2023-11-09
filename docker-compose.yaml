@@ -24,6 +24,7 @@ services:
   agapay:
     container_name: agapay
     image: ghcr.io/chariot/agapay:1.0.0
+    command: "-c /app/air.toml"
     build:
       context: .
       target: development

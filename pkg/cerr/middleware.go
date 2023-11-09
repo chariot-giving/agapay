@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"time"
 
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
@@ -15,19 +14,21 @@ func ErrorHandler() gin.HandlerFunc {
 		c.Next()
 		logger := c.Value("logger").(*zap.Logger)
 
+		c.Header("Content-Type", "application/json")
+
 		var sentError error
 		for _, err := range c.Errors {
 			// log, handle, etc.
 			httpError := new(HttpError)
 			if ok := errors.As(err, &httpError); ok {
-				logger.Error(fmt.Sprintf("%s: %s", httpError.ErrorMsg, httpError.Message),
-					zap.Error(httpError.Details),
-					zap.Int("code", httpError.Code))
+				logger.Error(fmt.Sprintf("%s: %s", httpError.Type, httpError.Title),
+					zap.Error(httpError.Cause),
+					zap.Int("code", httpError.Status))
 				if sentError == nil {
 					// status -1 doesn't overwrite existing status code
-					status := httpError.Code
+					status := httpError.Status
 					if c.IsAborted() {
-						status = -1
+						status = c.Writer.Status()
 					}
 					c.JSON(status, httpError)
 					sentError = httpError
@@ -36,16 +37,15 @@ func ErrorHandler() gin.HandlerFunc {
 				logger.Error(err.Error())
 				if sentError == nil {
 					httpError := &HttpError{
-						Timestamp: time.Now(),
-						Code:      http.StatusInternalServerError,
-						Message:   err.Error(),
-						ErrorMsg:  "Internal server error",
-						Details:   nil,
+						Status: http.StatusInternalServerError,
+						Type:   "Internal server error",
+						Title:  err.Error(),
+						Cause:  nil,
 					}
 					// status -1 doesn't overwrite existing status code
-					status := httpError.Code
+					status := httpError.Status
 					if c.IsAborted() {
-						status = -1
+						status = c.Writer.Status()
 					}
 					c.JSON(status, httpError)
 					sentError = err
