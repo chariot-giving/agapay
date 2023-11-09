@@ -185,3 +185,52 @@ If an original request is still being processed when an idempotency key is reuse
 Subsequent requests must be identical to the original request or the API will return a
 [422 Unprocessable Entity](https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/422) error.
 We discourage setting an idempotency key on `GET` and `DELETE` requests as these requests are inherently idempotent.
+
+## Future Roadmap & Strategy
+
+The vision for this project is to create a truly open database and network for payments to nonprofits.
+
+As part of this vision, we need to differentiate it from existing payment networks and databases, e.g. PayPal.
+
+![Agapay Network](./docs/assets/agapay_network.png)
+
+### Roles
+
+- **Recipient** - A recipient is a nonprofit entity that receives payments from payers.
+ Recipients can be a 501(c)(3) or a fiscal sponsor for a 501(c)(3).
+- **Network Service Provider** - A network service provider is a company that provides nonprofits access to the `Agapay` network
+ by offering them a public-facing payment address to receive payments.
+- **Payer** - A payer is an individual or organization that sends payments to recipients.
+
+### Entities
+
+#### Database
+
+At the crux of the network is the database of recipients and their payment addresses.
+
+This database is completely open and owned by everyone.
+
+The database itself enforces consistency and validity through a `proof-of-stake` model.
+
+Network service providers are responsible for adding and updating recipient data in the database.
+
+There exists a contract between the network service providers and the database that ensures
+data records are valid payment addresses and that the data is not tampered with.
+
+#### Settlement Layer
+
+The actual settlement layer is decoupled from the database of addresses.
+
+Addresses are simply pointers to actual accounts on the settlement layer.
+
+This allows the network to service a variety of different settlement layers including
+over the Federal Reserve's RTP network, ACH, and card networks as well as utilizing
+on-chain wallets, stablecoins and cryptocurrencies.
+
+### Differentiation
+
+- **Open Network** - Any nonprofit can join and receive payments.
+- **Open Database** - The database is open and owned by everyone.
+- **Universal Interopable Address** - Nonprofits own their own network addresses and can move freely between network service providers or even be their own network service provider.
+- **Supports Multiple Payment Rails** - `Agapay` network addresses are standard that can be used with any `open-network` payment rails.
+- **Open Marketplace** - Network service providers can compete on price and features which will drive down costs and increase innovation which has positive reinforcement feedback for the network itself.
