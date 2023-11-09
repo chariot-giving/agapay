@@ -26,6 +26,7 @@ model user {
   account         account[]
   payment         payment[]
   transfer        transfer[]
+  payment_intent  payment_intent[]
 }
 
 // idemporancy_key is a table to store the idempotency keys for the API
@@ -139,24 +140,25 @@ model organization {
 // routed correctly at the time of payment.
 model recipient {
   // The unique identifier of the recipient
-  id                 String       @id @default(uuid()) @db.Uuid
+  id                 String           @id @default(uuid()) @db.Uuid
   // The name of the recipient
-  name               String       @db.VarChar(255)
+  name               String           @db.VarChar(255)
   // a flag to indicate if the recipient is a primary recipient for an organization
   // there should only ever be one primary recipient for any organization
-  primary            Boolean      @default(false)
+  primary            Boolean          @default(false)
   // the identifier of the organization for this recipient
-  organization_id    String       @db.VarChar(255)
-  organization       organization @relation(fields: [organization_id], references: [id], onDelete: Cascade, onUpdate: Cascade, map: "fk_recipient_organization")
+  organization_id    String           @db.VarChar(255)
+  organization       organization     @relation(fields: [organization_id], references: [id], onDelete: Cascade, onUpdate: Cascade, map: "fk_recipient_organization")
   // the identifier of the bank address for the recipient
-  bank_address_id    BigInt       @db.BigInt
-  bankAddress        bank_address @relation(fields: [bank_address_id], references: [id], onDelete: Cascade, onUpdate: Cascade, map: "fk_recipient_bank_address")
+  bank_address_id    BigInt           @db.BigInt
+  bankAddress        bank_address     @relation(fields: [bank_address_id], references: [id], onDelete: Cascade, onUpdate: Cascade, map: "fk_recipient_bank_address")
   // the identifier of the mailing address for the recipient
-  mailing_address_id BigInt       @db.BigInt
-  mailingAddress     address      @relation(fields: [mailing_address_id], references: [id], onDelete: Cascade, onUpdate: Cascade, map: "fk_recipient_mailing_address")
+  mailing_address_id BigInt           @db.BigInt
+  mailingAddress     address          @relation(fields: [mailing_address_id], references: [id], onDelete: Cascade, onUpdate: Cascade, map: "fk_recipient_mailing_address")
   // the time the recipient was created
-  created_at         DateTime     @default(now()) @db.Timestamptz(6)
+  created_at         DateTime         @default(now()) @db.Timestamptz(6)
   payment            payment[]
+  payment_intent     payment_intent[]
 
   @@index([organization_id], map: "idx_recipient_organization_id")
 }
@@ -197,6 +199,25 @@ model payment {
   @@index([account_id], map: "idx_payment_account_id")
   @@index([chariot_id], map: "idx_payment_chariot_id")
   @@index([account_id, recipient_id], map: "idx_payment_account_id_recipient_id")
+}
+
+// payment_intent represents a payment intent from an account to a recipient
+// this is used to track offline payments that are not processed through the API
+model payment_intent {
+  // the unique identifier for the payment intent
+  id           BigInt    @id @default(autoincrement()) @db.BigInt
+  // the amount of the intent in USD cents
+  amount       BigInt    @db.BigInt
+  // the identifier of the chariot initiated grant for reconciliation purposes
+  chariot_id   String?   @db.VarChar(255)
+  // the identifier of the recipient of the payment intent
+  recipient_id String    @db.Uuid
+  recipient    recipient @relation(fields: [recipient_id], references: [id], onDelete: Cascade, onUpdate: Cascade, map: "fk_payment_intent_recipient")
+  // the identifier of the user that created the payment intent
+  user_id      BigInt    @db.BigInt
+  user         user      @relation(fields: [user_id], references: [id], onDelete: Restrict, onUpdate: Cascade, map: "fk_payment_intent_user")
+  // the time the intent was created
+  created_at         DateTime         @default(now()) @db.Timestamptz(6)
 }
 
 // transfer represents a transfer of funds into an account
@@ -260,16 +281,18 @@ model address {
 // BankAddress is the address to send electronic payments
 model bank_address {
   // the unique identifier for the bank address
-  id             BigInt              @id @default(autoincrement()) @db.BigInt
+  id                     BigInt              @id @default(autoincrement()) @db.BigInt
   // the account number of the bank account
-  account_number String              @db.VarChar(255)
+  account_number         String              @db.VarChar(255)
   // the ABA routing number of the financial institution
-  routing_number String              @db.VarChar(255)
+  routing_number         String              @db.VarChar(255)
+  // the preferred payment rail for the bank address
+  preferred_payment_rail payment_rail?
   // the status of the bank address
-  status         bank_address_status
+  status                 bank_address_status
   // the time the bank address was last updated
-  updated_at     DateTime            @updatedAt @db.Timestamptz(6)
-  recipient      recipient[]
+  updated_at             DateTime            @updatedAt @db.Timestamptz(6)
+  recipient              recipient[]
 
   @@index([routing_number, account_number], map: "idx_bank_address_routing_number_account_number")
 }

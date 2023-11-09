@@ -14,4 +14,5 @@ bin = "tmp/main"
 full_bin = "dlv exec --accept-multiclient --log --headless --continue --listen :1357 --api-version 2 ./tmp/main"
 # Watch these filename extensions.
 include_ext = ["go", "tpl", "tmpl"]
+# Exclude these directories
 exclude_dir = ["node_modules"]

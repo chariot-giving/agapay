@@ -8,8 +8,8 @@
         "dist/**"
     ],
     "scripts": {
-        "build:db": "prisma format && prisma generate",
-        "build": "npm run build:db",
+        "db:build": "prisma format && prisma generate",
+        "build": "npm run db:build",
         "clean": "rm -rf .turbo && rm -rf node_modules && rm -rf dist",
         "docker:base": "docker compose --project-name agapay -f docker-compose.yaml --env-file .env",
         "docker:dev": "npm run docker:base up --renew-anon-volumes",

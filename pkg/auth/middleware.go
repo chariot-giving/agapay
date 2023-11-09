@@ -13,21 +13,18 @@ func ApiKeyAuth() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		authorization := c.GetHeader("Authorization")
 		if authorization == "" {
-			c.Error(cerr.NewUnauthorizedError("Missing Authorization header", nil))
-			c.Abort()
+			c.AbortWithError(401, cerr.NewUnauthorizedError("Missing Authorization header", nil))
 			return
 		}
 
 		parts := strings.Split(authorization, " ")
 		if len(parts) != 2 {
-			c.Error(cerr.NewUnauthorizedError("Invalid Authorization header", nil))
-			c.Abort()
+			c.AbortWithError(401, cerr.NewUnauthorizedError("Invalid Authorization header", nil))
 			return
 		}
 
 		if parts[0] != "Bearer" {
-			c.Error(cerr.NewUnauthorizedError("Invalid Authorization header", nil))
-			c.Abort()
+			c.AbortWithError(401, cerr.NewUnauthorizedError("Invalid Authorization header", nil))
 			return
 		}
 
@@ -35,8 +32,7 @@ func ApiKeyAuth() gin.HandlerFunc {
 
 		// TODO: update this to use real auth service
 		if bearerToken != "chariot$123" {
-			c.Error(cerr.NewUnauthorizedError("Invalid Authorization", nil))
-			c.Abort()
+			c.AbortWithError(401, cerr.NewUnauthorizedError("Invalid Authorization", nil))
 			return
 		}
 
