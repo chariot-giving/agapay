@@ -15,4 +15,4 @@ full_bin = "dlv exec --accept-multiclient --log --headless --continue --listen :
 # Watch these filename extensions.
 include_ext = ["go", "tpl", "tmpl"]
 # Exclude these directories
-exclude_dir = ["node_modules"]
+exclude_dir = ["node_modules", "prisma", "docs", "migrations"]

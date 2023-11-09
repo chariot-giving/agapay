@@ -12,7 +12,6 @@ import (
 	"github.com/chariot-giving/agapay/pkg/atomic"
 	"github.com/chariot-giving/agapay/pkg/bank"
 	"github.com/chariot-giving/agapay/pkg/cerr"
-	"github.com/increase/increase-go"
 	"go.uber.org/zap"
 	"gorm.io/gorm"
 )
@@ -198,9 +197,9 @@ func (s *TransfersService) createBankTransfer(ctx context.Context, handle *atomi
 			IdempotencyKey: key.Key,
 		})
 		if err != nil {
-			var apierr *increase.Error
+			var apierr *cerr.HttpError
 			if errors.As(err, &apierr) {
-				return atomic.Response{Status: apierr.StatusCode, Data: cerr.NewHttpError(apierr.StatusCode, "failed to create bank transfer", apierr)}, nil
+				return atomic.Response{Status: apierr.Status, Data: apierr}, nil
 			}
 			return atomic.Response{Status: 503, Data: cerr.NewHttpError(503, "failed to create bank transfer", err)}, nil
 		}

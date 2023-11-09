@@ -11,7 +11,6 @@ import (
 	"github.com/chariot-giving/agapay/pkg/atomic"
 	"github.com/chariot-giving/agapay/pkg/bank"
 	"github.com/chariot-giving/agapay/pkg/cerr"
-	"github.com/increase/increase-go"
 	"go.uber.org/zap"
 	"gorm.io/gorm"
 )
@@ -153,9 +152,9 @@ func (s *AccountsService) createBankAccount(ctx context.Context, handle *atomic.
 			IdempotencyKey: key.Key,
 		})
 		if err != nil {
-			var apierr *increase.Error
+			var apierr *cerr.HttpError
 			if errors.As(err, &apierr) {
-				return atomic.Response{Status: apierr.StatusCode, Data: cerr.NewHttpError(apierr.StatusCode, "failed to create bank account", apierr)}, nil
+				return atomic.Response{Status: apierr.Status, Data: apierr}, nil
 			}
 			return atomic.Response{Status: 503, Data: cerr.NewHttpError(503, "failed to create bank account", err)}, nil
 		}
@@ -198,9 +197,9 @@ func (s *AccountsService) createBankAccountNumber(ctx context.Context, handle *a
 			IdempotencyKey: key.Key,
 		})
 		if err != nil {
-			var apierr *increase.Error
+			var apierr *cerr.HttpError
 			if errors.As(err, &apierr) {
-				return atomic.Response{Status: apierr.StatusCode, Data: cerr.NewHttpError(apierr.StatusCode, "failed to create bank account numbers", apierr)}, nil
+				return atomic.Response{Status: apierr.Status, Data: apierr}, nil
 			}
 			return atomic.Response{Status: 503, Data: cerr.NewHttpError(503, "failed to create bank account numbers", err)}, nil
 		}

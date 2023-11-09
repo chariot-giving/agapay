@@ -10,22 +10,18 @@
 
 package openapi
 
-import (
-	"time"
-)
-
-// ApiError - An API error
+// ApiError - An API error that conforms to RFC 7807 problem details object
 type ApiError struct {
 
-	// The date and time the error occurred
-	Timestamp time.Time `json:"timestamp,omitempty"`
+	// A URI reference that identifies the problem type
+	Type string `json:"type,omitempty"`
+
+	// A short, human-readable summary of the problem type.
+	Title string `json:"title,omitempty"`
 
 	// The HTTP status code
 	Status int32 `json:"status,omitempty"`
 
-	// The HTTP status message
-	Error string `json:"error,omitempty"`
-
-	// The error message
-	Message string `json:"message,omitempty"`
+	// A human-readable explanation specific to this occurrence of the problem.
+	Detail string `json:"detail,omitempty"`
 }

@@ -4,135 +4,124 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"time"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
 
 type HttpError struct {
-	Timestamp time.Time
-	Code      int
-	Message   string
-	ErrorMsg  string
-	Details   error
+	Type   string
+	Title  string
+	Status int
+	Cause  error
 }
 
 func (he HttpError) MarshalJSON() ([]byte, error) {
 	details := ""
-	if he.Details != nil {
-		details = he.Details.Error()
+	if he.Cause != nil {
+		details = he.Cause.Error()
 	}
 	return json.Marshal(
 		struct {
-			Timestamp time.Time `json:"timestamp"`
-			Code      int       `json:"code"`
-			Message   string    `json:"message"`
-			ErrorMsg  string    `json:"error"`
-			Details   string    `json:"details,omitempty"`
-		}{he.Timestamp, he.Code, he.Message, he.ErrorMsg, details})
+			Status int    `json:"status"`
+			Type   string `json:"type"`
+			Title  string `json:"title"`
+			Detail string `json:"detail,omitempty"`
+		}{he.Status, he.Type, he.Title, details})
 }
 
 func NewHttpError(code int, msg string, cause error) *HttpError {
 	err := &HttpError{
-		Timestamp: time.Now(),
-		Code:      code,
-		ErrorMsg:  http.StatusText(code),
-		Message:   msg,
+		Status: code,
+		Type:   http.StatusText(code),
+		Title:  msg,
 	}
 	if cause != nil {
-		err.Details = cause
+		err.Cause = cause
 	}
 	return err
 }
 
 func NewBadRequest(msg string, cause error) *HttpError {
 	err := &HttpError{
-		Timestamp: time.Now(),
-		Code:      http.StatusBadRequest,
-		ErrorMsg:  "Bad Request",
-		Message:   msg,
+		Status: http.StatusBadRequest,
+		Type:   "Bad Request",
+		Title:  msg,
 	}
 	if cause != nil {
-		err.Details = cause
+		err.Cause = cause
 	}
 	return err
 }
 
 func NewUnauthorizedError(msg string, cause error) *HttpError {
 	err := &HttpError{
-		Timestamp: time.Now(),
-		Code:      http.StatusUnauthorized,
-		ErrorMsg:  "Unauthorized",
-		Message:   msg,
+		Status: http.StatusUnauthorized,
+		Type:   "Unauthorized",
+		Title:  msg,
 	}
 	if cause != nil {
-		err.Details = cause
+		err.Cause = cause
 	}
 	return err
 }
 
 func NewForbiddenError(msg string, cause error) *HttpError {
 	err := &HttpError{
-		Timestamp: time.Now(),
-		Code:      http.StatusForbidden,
-		ErrorMsg:  "Forbidden",
-		Message:   msg,
+		Status: http.StatusForbidden,
+		Type:   "Forbidden",
+		Title:  msg,
 	}
 	if cause != nil {
-		err.Details = cause
+		err.Cause = cause
 	}
 	return err
 }
 
 func NewNotFoundError(msg string, cause error) *HttpError {
 	err := &HttpError{
-		Timestamp: time.Now(),
-		Code:      http.StatusNotFound,
-		ErrorMsg:  "Not Found",
-		Message:   msg,
+		Status: http.StatusNotFound,
+		Type:   "Not Found",
+		Title:  msg,
 	}
 	if cause != nil {
-		err.Details = cause
+		err.Cause = cause
 	}
 	return err
 }
 
 func NewConflictError(msg string, cause error) *HttpError {
 	err := &HttpError{
-		Timestamp: time.Now(),
-		Code:      http.StatusConflict,
-		ErrorMsg:  "Conflict",
-		Message:   msg,
+		Status: http.StatusConflict,
+		Type:   "Conflict",
+		Title:  msg,
 	}
 	if cause != nil {
-		err.Details = cause
+		err.Cause = cause
 	}
 	return err
 }
 
 func NewGoneError(msg string, cause error) *HttpError {
 	err := &HttpError{
-		Timestamp: time.Now(),
-		Code:      http.StatusGone,
-		ErrorMsg:  "Gone",
-		Message:   msg,
+		Status: http.StatusGone,
+		Type:   "Gone",
+		Title:  msg,
 	}
 	if cause != nil {
-		err.Details = cause
+		err.Cause = cause
 	}
 	return err
 }
 
 func NewInternalServerError(msg string, cause error) *HttpError {
 	err := &HttpError{
-		Timestamp: time.Now(),
-		Code:      http.StatusInternalServerError,
-		ErrorMsg:  "Internal server error",
-		Message:   msg,
+		Status: http.StatusInternalServerError,
+		Type:   "Internal server error",
+		Title:  msg,
 	}
 	if cause != nil {
-		err.Details = cause
+		err.Cause = cause
 	}
 	return err
 }
@@ -141,24 +130,22 @@ func NewBadGatewayError(msg string, cause error) *HttpError {
 	status, ok := status.FromError(cause)
 	if ok {
 		err := &HttpError{
-			Timestamp: time.Now(),
-			Code:      grpcToHTTPStatusCode(status),
-			ErrorMsg:  status.Code().String(),
-			Message:   msg,
+			Status: grpcToHTTPStatusCode(status),
+			Type:   status.Code().String(),
+			Title:  msg,
 		}
 		if cause != nil {
-			err.Details = status.Err()
+			err.Cause = status.Err()
 		}
 		return err
 	} else {
 		err := &HttpError{
-			Timestamp: time.Now(),
-			Code:      http.StatusBadGateway,
-			ErrorMsg:  "Bad Gateway",
-			Message:   msg,
+			Status: http.StatusBadGateway,
+			Type:   "Bad Gateway",
+			Title:  msg,
 		}
 		if cause != nil {
-			err.Details = cause
+			err.Cause = cause
 		}
 		return err
 	}
@@ -166,19 +153,18 @@ func NewBadGatewayError(msg string, cause error) *HttpError {
 
 func NewDatabaseError(msg string, cause error) *HttpError {
 	err := &HttpError{
-		Timestamp: time.Now(),
-		Code:      http.StatusInternalServerError,
-		ErrorMsg:  "Internal server error",
-		Message:   msg,
+		Status: http.StatusInternalServerError,
+		Type:   "Internal server error",
+		Title:  msg,
 	}
 	if cause != nil {
-		err.Details = cause
+		err.Cause = cause
 	}
 	return err
 }
 
 func (h *HttpError) Error() string {
-	return fmt.Sprintf("HttpError [%d]: %s; caused by: %s", h.Code, h.Message, h.Details)
+	return fmt.Sprintf("HttpError [%d]: %s; caused by: %s", h.Status, h.Title, h.Cause)
 }
 
 func grpcToHTTPStatusCode(s *status.Status) int {
