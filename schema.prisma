@@ -9,11 +9,6 @@ generator markdown {
   title    = "Chariot Payments"
 }
 
-generator docs {
-  provider = "node node_modules/prisma-docs-generator"
-  output   = "./prisma/docs"
-}
-
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
