@@ -11,14 +11,15 @@
 package openapi
 
 import (
-	"log"
 	"net/http"
-	"os"
 
 	"github.com/chariot-giving/agapay/pkg/auth"
 	"github.com/chariot-giving/agapay/pkg/cerr"
+	"github.com/chariot-giving/agapay/pkg/core"
 	"github.com/chariot-giving/agapay/pkg/logger"
+	"github.com/chariot-giving/agapay/pkg/telemetry"
 	"github.com/gin-gonic/gin"
+	"go.uber.org/zap"
 )
 
 // Route is the information for every URI.
@@ -29,51 +30,44 @@ type Route struct {
 	Method string
 	// Pattern is the pattern of the URI.
 	Pattern string
-	// HandlerFunc is the handler function of this route.
-	HandlerFunc gin.HandlerFunc
 }
 
 // Routes is the list of the generated Route.
 type Routes []Route
 
 // NewRouter returns a new router.
-func NewRouter() *gin.Engine {
+func NewRouter(server *core.AgapayServer) *gin.Engine {
 	router := gin.Default()
 	router.NoRoute(func(c *gin.Context) {
-		c.Error(cerr.NewNotFoundError("route not found", nil))
+		c.JSON(404, cerr.NewNotFoundError("route not found", nil))
 	})
-
-	logLevel := os.Getenv("LOG_LEVEL")
-	if logLevel == "" {
-		logLevel = "info"
-	}
-	zapLogger, err := logger.Init(logLevel, "2006-01-02 15:04:05.000 MST")
-	if err != nil {
-		log.Fatalf("failed to initialize logger: %v", err)
-	}
-	defer logger.Flush() // flushes buffer on exit
 
 	// add middleware
 	middlewares := []gin.HandlerFunc{
-		logger.RequestIDMiddleware(),
-		logger.LoggingMiddleware(zapLogger),
+		telemetry.RequestIDMiddleware(),
+		logger.LoggingMiddleware(zap.L()),
 		auth.ApiKeyAuth(),
 		cerr.ErrorHandler(),
 	}
 	router.Use(middlewares...)
 
+	openApiServer := openAPIServer{
+		core: server,
+	}
+
 	for _, route := range routes {
+		handler := openApiServer.getHandler(route.Name)
 		switch route.Method {
 		case http.MethodGet:
-			router.GET(route.Pattern, route.HandlerFunc)
+			router.GET(route.Pattern, handler)
 		case http.MethodPost:
-			router.POST(route.Pattern, route.HandlerFunc)
+			router.POST(route.Pattern, handler)
 		case http.MethodPut:
-			router.PUT(route.Pattern, route.HandlerFunc)
+			router.PUT(route.Pattern, handler)
 		case http.MethodPatch:
-			router.PATCH(route.Pattern, route.HandlerFunc)
+			router.PATCH(route.Pattern, handler)
 		case http.MethodDelete:
-			router.DELETE(route.Pattern, route.HandlerFunc)
+			router.DELETE(route.Pattern, handler)
 		}
 	}
 
@@ -90,118 +84,101 @@ var routes = Routes{
 		"Index",
 		http.MethodGet,
 		"/",
-		Index,
 	},
 
 	{
 		"CreateAccount",
 		http.MethodPost,
 		"/accounts",
-		CreateAccount,
 	},
 
 	{
 		"GetAccount",
 		http.MethodGet,
 		"/accounts/:id",
-		GetAccount,
 	},
 
 	{
 		"GetAccountDetails",
 		http.MethodGet,
 		"/accounts/:id/details",
-		GetAccountDetails,
 	},
 
 	{
 		"ListAccounts",
 		http.MethodGet,
 		"/accounts",
-		ListAccounts,
 	},
 
 	{
 		"GetAccountBalances",
 		http.MethodGet,
 		"/accounts/:id/balances",
-		GetAccountBalances,
 	},
 
 	{
 		"CreatePayment",
 		http.MethodPost,
 		"/payments",
-		CreatePayment,
 	},
 
 	{
 		"GetPayment",
 		http.MethodGet,
 		"/payments/:id",
-		GetPayment,
 	},
 
 	{
 		"ListPayments",
 		http.MethodGet,
 		"/payments",
-		ListPayments,
 	},
 
 	{
 		"CreateRecipient",
 		http.MethodPost,
 		"/recipients",
-		CreateRecipient,
 	},
 
 	{
 		"GetRecipient",
 		http.MethodGet,
 		"/recipients/:id",
-		GetRecipient,
 	},
 
 	{
 		"ListRecipients",
 		http.MethodGet,
 		"/recipients",
-		ListRecipients,
 	},
 
 	{
 		"GetTransaction",
 		http.MethodGet,
 		"/transactions/:id",
-		GetTransaction,
 	},
 
 	{
 		"ListTransactions",
 		http.MethodGet,
 		"/transactions",
-		ListTransactions,
 	},
 
 	{
 		"GetTransfer",
 		http.MethodGet,
 		"/transfers/:id",
-		GetTransfer,
 	},
 
 	{
 		"ListTransfers",
 		http.MethodGet,
 		"/transfers",
-		ListTransfers,
 	},
 
 	{
 		"TransferFunds",
 		http.MethodPost,
 		"/transfers",
-		TransferFunds,
 	},
 }

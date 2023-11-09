@@ -54,6 +54,7 @@ async function seedRecipients() {
     },
     create: {
       id: "e8ff4be1-4603-4bb8-95f3-953c7b95882b",
+      name: "Chariot Giving Network",
       primary: true,
       organization: {
         connect: {

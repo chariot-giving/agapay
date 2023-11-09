@@ -10,10 +10,9 @@
 
 package openapi
 
-// AccountDetails - The details of an account
-type AccountDetails struct {
-	Numbers AccountNumbers `json:"numbers,omitempty"`
+// AccountNumbers - The identifying numbers used for making electronic transfers to accounts
+type AccountNumbers struct {
 
-	// The status of the account
-	Status string `json:"status,omitempty"`
+	// The ACH numbers
+	Ach []AchNumber `json:"ach,omitempty"`
 }

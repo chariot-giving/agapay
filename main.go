@@ -11,30 +11,75 @@
 package main
 
 import (
+	"database/sql"
 	"log"
+	"os"
+	"time"
 
 	"github.com/chariot-giving/agapay/openapi"
-	"github.com/chariot-giving/agapay/pkg/adb"
-	"github.com/chariot-giving/agapay/pkg/network"
+	"github.com/chariot-giving/agapay/pkg/bank"
+	"github.com/chariot-giving/agapay/pkg/core"
+	"github.com/chariot-giving/agapay/pkg/logger"
+	"go.uber.org/zap"
+	"gorm.io/driver/postgres"
+	"gorm.io/gorm"
+	"gorm.io/gorm/schema"
 )
 
 func main() {
-	router := openapi.NewRouter()
+	logger := initLogger()
+	defer logger.Sync() // flushes buffer on exit
 
-	// client := db.NewClient()
-	// if err := client.Prisma.Connect(); err != nil {
-	// 	panic(err)
-	// }
+	// database
+	db, sqlDb := initDb()
+	defer sqlDb.Close()
 
-	// defer func() {
-	// 	if err := client.Prisma.Disconnect(); err != nil {
-	// 		panic(err)
-	// 	}
-	// }()
+	// bank
+	bankImpl := bank.NewBank()
 
-	// initialize global variable
-	network.PayeeDB = network.NewPayeeDatabase()
-	adb.NewAgapayDatabase()
+	// server
+	server := core.NewAgapayServer(db, bankImpl)
 
+	// router
+	router := openapi.NewRouter(server)
 	log.Fatal(router.Run(":8088"))
+}
+
+func initDb() (*gorm.DB, *sql.DB) {
+	connStr := os.Getenv("DATABASE_URL")
+	if connStr == "" {
+		panic("DATABASE_URL environment variable is not set")
+	}
+	db, err := gorm.Open(postgres.Open(connStr), &gorm.Config{
+		NamingStrategy: schema.NamingStrategy{
+			TablePrefix:   "public.",
+			SingularTable: true,
+		},
+		PrepareStmt: true, // Creates a prepared statement when executing any SQL and caches them to speed up future calls
+	})
+	if err != nil {
+		panic(err)
+	}
+	sqlDb, err := db.DB()
+	if err != nil {
+		panic(err)
+	}
+	// configure connection pool settings
+	sqlDb.SetMaxIdleConns(3)
+	sqlDb.SetMaxOpenConns(10)
+	sqlDb.SetConnMaxLifetime(time.Hour)
+
+	return db, sqlDb
+}
+
+func initLogger() *zap.Logger {
+	logLevel := os.Getenv("LOG_LEVEL")
+	if logLevel == "" {
+		logLevel = "info"
+	}
+	zapLogger, err := logger.Init(logLevel, "2006-01-02 15:04:05.000 MST")
+	if err != nil {
+		log.Fatalf("failed to initialize logger: %v", err)
+	}
+	return zapLogger
 }

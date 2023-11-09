@@ -11,98 +11,99 @@
 package openapi
 
 import (
+	"errors"
 	"net/http"
-	"time"
+	"strconv"
 
-	"github.com/chariot-giving/agapay/pkg/bank"
 	"github.com/chariot-giving/agapay/pkg/cerr"
-	"github.com/chariot-giving/agapay/pkg/network"
+	"github.com/chariot-giving/agapay/pkg/core"
 	"github.com/gin-gonic/gin"
-	"github.com/google/uuid"
 )
 
 // CreateRecipient - Create a recipient
-func CreateRecipient(c *gin.Context) {
+func (api *openAPIServer) CreateRecipient(c *gin.Context) {
 	request := new(CreateRecipientRequest)
 	if err := c.ShouldBindJSON(request); err != nil {
-		c.JSON(http.StatusBadRequest, cerr.NewBadRequest("invalid request body", err))
+		c.Error(cerr.NewBadRequest("invalid request body", err))
 		return
 	}
 
-	// search EIN on guidestar
-
-	// TODO: store recipients within our DB (do this before or after increase.com API call?)
-	payeeId := uuid.New().String()
-	err := network.PayeeDB.CreatePayeeElectronicAccount(payeeId, network.PayeeElectronicAccount{
-		Name:          request.Name,
-		AccountNumber: request.BankAddress.AccountNumber,
-		RoutingNumber: request.BankAddress.RoutingNumber,
-	})
-	if err != nil {
-		c.JSON(http.StatusBadGateway, cerr.NewBadGatewayError("error creating payee", err))
-		return
-	}
-
-	// entity, err := bank.IncreaseClient.Entities.New(c, increase.EntityNewParams{
-	// 	Structure:   increase.F[increase.EntityNewParamsStructure](increase.EntityNewParamsStructureCorporation),
-	// 	Description: increase.String(request.Name),
-	// 	Corporation: increase.F[increase.EntityNewParamsCorporation](increase.EntityNewParamsCorporation{
-	// 		Name:          increase.String(request.Name),
-	// 		TaxIdentifier: increase.String(request.Ein),
-	// 		BeneficialOwners: increase.F[[]increase.EntityNewParamsCorporationBeneficialOwner]([]increase.EntityNewParamsCorporationBeneficialOwner{
-	// 			increase.EntityNewParamsCorporationBeneficialOwner{
-	// 				Individual: increase.F[increase.EntityNewParamsCorporationBeneficialOwnersIndividual](increase.EntityNewParamsCorporationBeneficialOwnersIndividual{
-
-	// 				}),
-	// 			},
-	// 		}),
-	// 	}),
-	// })
-	// if err != nil {
-	// 	c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-	// 	return
-	// }
-
-	recipient := Recipient{
-		Id:        payeeId,
-		Name:      request.Name,
-		Ein:       request.Ein,
-		Primary:   true,
-		Status:    "unverified",
-		CreatedAt: time.Now(),
-	}
-
-	c.Header("Location", "/recipients/"+recipient.Id)
-	c.JSON(http.StatusOK, &recipient)
+	c.Error(cerr.NewHttpError(http.StatusNotImplemented, "not implemented", nil))
 }
 
 // GetRecipient - Retrieve a recipient
-func GetRecipient(c *gin.Context) {
+func (s *openAPIServer) GetRecipient(c *gin.Context) {
 	id := c.Param("id")
 
-	// TODO: do we store and retrieve recipients as entities within the Increase.com API/models?
-	entity, err := bank.IncreaseClient.Entities.Get(c, id)
+	recipient, err := s.core.Recipients.Get(c, id)
 	if err != nil {
-		c.JSON(http.StatusNotFound, cerr.NewNotFoundError("recipient not found", err))
+		cErr := new(cerr.HttpError)
+		if errors.As(err, &cErr) {
+			c.Error(cErr)
+			return
+		}
+		c.Error(cerr.NewInternalServerError("failed to retrieve recipient", err))
 		return
 	}
 
-	recipient := Recipient{
-		Id:        entity.ID,
-		Name:      entity.Description,
-		Ein:       entity.Corporation.TaxIdentifier,
-		Primary:   true,
-		Status:    string(entity.Status),
-		CreatedAt: time.Now(),
-	}
-
-	c.JSON(http.StatusOK, &recipient)
+	c.JSON(http.StatusOK, &Recipient{
+		Id:        recipient.Id.String(),
+		Name:      recipient.Organization.LegalName,
+		Ein:       recipient.Organization.Ein,
+		Primary:   recipient.Primary,
+		CreatedAt: recipient.CreatedAt,
+		Status:    recipient.BankAddress.Status,
+	})
 }
 
 // ListRecipients - List recipients
-func ListRecipients(c *gin.Context) {
-	// TODO: do we store and retrieve recipients as entities within the Increase.com API/models?
-	// If so, there's not a great way to list and filter recipients by EIN, so we may need to
-	// implement this ourselves.
-	c.JSON(http.StatusOK, gin.H{})
+func (s *openAPIServer) ListRecipients(c *gin.Context) {
+	limitQuery := c.DefaultQuery("limit", "100")
+	limit, err := strconv.Atoi(limitQuery)
+	if err != nil {
+		limit = 100
+	}
+
+	listParams := core.ListRecipientsRequest{
+		Limit: limit,
+		Ein:   c.Query("ein"),
+	}
+
+	cursor, ok := c.GetQuery("cursor")
+	if ok {
+		listParams.Cursor = cursor
+	}
+
+	response, err := s.core.Recipients.List(c, listParams)
+	if err != nil {
+		cErr := new(cerr.HttpError)
+		if errors.As(err, &cErr) {
+			c.Error(cErr)
+			return
+		}
+		c.Error(cerr.NewInternalServerError("error listing accounts", err))
+		return
+	}
+
+	recipientList := make([]Recipient, len(response.Recipients))
+	for i, recipient := range response.Recipients {
+		recipientList[i] = Recipient{
+			Id:        recipient.Id.String(),
+			Name:      recipient.Organization.LegalName,
+			Ein:       recipient.Organization.Ein,
+			Primary:   recipient.Primary,
+			CreatedAt: recipient.CreatedAt,
+		}
+	}
+
+	c.JSON(http.StatusOK, &RecipientList{
+		Data: recipientList,
+		Paging: Pagination{
+			Total: int32(len(response.Recipients)),
+			Cursors: PaginationCursors{
+				Before: cursor,
+				After:  response.NextCursor,
+			},
+		},
+	})
 }

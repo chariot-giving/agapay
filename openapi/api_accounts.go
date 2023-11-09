@@ -15,18 +15,17 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/chariot-giving/agapay/pkg/adb"
+	"github.com/chariot-giving/agapay/pkg/atomic"
 	"github.com/chariot-giving/agapay/pkg/auth"
-	"github.com/chariot-giving/agapay/pkg/bank"
 	"github.com/chariot-giving/agapay/pkg/cerr"
+	"github.com/chariot-giving/agapay/pkg/core"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
-	"github.com/increase/increase-go"
 	"go.uber.org/zap"
 )
 
 // CreateAccount - Create an account
-func CreateAccount(c *gin.Context) {
+func (api *openAPIServer) CreateAccount(c *gin.Context) {
 	logger := c.Value("logger").(*zap.Logger)
 
 	requestBody := new(Account)
@@ -48,7 +47,7 @@ func CreateAccount(c *gin.Context) {
 	for _, v := range c.Params {
 		params[v.Key] = v.Value
 	}
-	request := &adb.IdempotentRequest{
+	request := &atomic.IdempotentRequest{
 		UserId:         auth.UserId(c),
 		IdempotencyKey: idempotencyKey,
 		Method:         c.Request.Method,
@@ -56,86 +55,30 @@ func CreateAccount(c *gin.Context) {
 		Params:         params,
 		Body:           requestBody,
 	}
-	key, err := adb.AgapayDatabase.UpsertIdempotencyKey(request)
+
+	createAccount := core.CreateAccountRequest{
+		Name: requestBody.Name,
+	}
+
+	key, err := api.core.Accounts.Create(c, request, &createAccount)
 	if err != nil {
 		cErr := new(cerr.HttpError)
 		if errors.As(err, &cErr) {
 			c.Error(cErr)
 			return
 		}
-		c.Error(cerr.NewInternalServerError("failed to upsert idempotency key", err))
+		c.Error(cerr.NewInternalServerError("failed to create account", err))
 		return
-	}
-
-	logger.Info("idempotency key upserted", zap.String("idempotency_key", idempotencyKey))
-
-	account := new(adb.Account)
-
-	// start the state machine
-	for {
-		switch key.RecoveryPoint {
-		case adb.RecoveryPointStarted:
-			// create the account
-			account = &adb.Account{
-				IdempotencyKeyId: key.Id,
-				UserId:           strconv.FormatUint(key.UserId, 10),
-				Name:             requestBody.Name,
-			}
-			_, err := adb.AgapayDatabase.CreateAccount(c, key, account)
-			if err != nil {
-				cErr := new(cerr.HttpError)
-				if errors.As(err, &cErr) {
-					c.Error(cErr)
-					return
-				}
-				c.Error(cerr.NewInternalServerError("failed to create account", err))
-				return
-			}
-		case adb.RecoveryPointAccountCreated:
-			// create the bank account
-			_, err := adb.AgapayDatabase.CreateBankAccount(c, key, account)
-			if err != nil {
-				cErr := new(cerr.HttpError)
-				if errors.As(err, &cErr) {
-					c.Error(cErr)
-					return
-				}
-				c.Error(cerr.NewInternalServerError("failed to create bank account", err))
-				return
-			}
-		case adb.RecoveryPointBankAccountCreated:
-			// create the bank account number
-			_, err := adb.AgapayDatabase.CreateBankAccountNumber(c, key, account)
-			if err != nil {
-				cErr := new(cerr.HttpError)
-				if errors.As(err, &cErr) {
-					c.Error(cErr)
-					return
-				}
-				c.Error(cerr.NewInternalServerError("failed to create bank account number", err))
-				return
-			}
-		case adb.RecoveryPointFinished:
-			// we're done
-		default:
-			c.Error(cerr.NewInternalServerError("bug: unknown recovery point", nil))
-			return
-		}
-
-		// if we're done, break out of the loop
-		if key.RecoveryPoint == adb.RecoveryPointFinished {
-			break
-		}
 	}
 
 	c.JSON(key.ResponseCode, key.ResponseBody)
 }
 
 // GetAccount - Retrieve an account
-func GetAccount(c *gin.Context) {
+func (api *openAPIServer) GetAccount(c *gin.Context) {
 	id := c.Param("id")
 
-	account, err := adb.AgapayDatabase.GetAccount(c, id)
+	account, err := api.core.Accounts.Get(c, id)
 	if err != nil {
 		cErr := new(cerr.HttpError)
 		if errors.As(err, &cErr) {
@@ -150,86 +93,82 @@ func GetAccount(c *gin.Context) {
 }
 
 // GetAccountDetails - Retrieve account details
-func GetAccountDetails(c *gin.Context) {
+func (api *openAPIServer) GetAccountDetails(c *gin.Context) {
 	id := c.Param("id")
 
-	bankAccount, err := bank.IncreaseClient.Accounts.Get(c, id)
+	bankDetails, err := api.core.Accounts.GetDetails(c, id)
 	if err != nil {
-		c.JSON(http.StatusBadGateway, cerr.NewBadGatewayError("error retrieving account", err))
+		cErr := new(cerr.HttpError)
+		if errors.As(err, &cErr) {
+			c.Error(cErr)
+			return
+		}
+		c.Error(cerr.NewInternalServerError("failed to retrieve account details", err))
 		return
 	}
 
-	accountNumbers, err := bank.IncreaseClient.AccountNumbers.List(c, increase.AccountNumberListParams{
-		AccountID: increase.String(bankAccount.ID),
-		Status:    increase.F[increase.AccountNumberListParamsStatus](increase.AccountNumberListParamsStatusActive),
-	})
-	if err != nil {
-		c.JSON(http.StatusBadGateway, cerr.NewBadGatewayError("error retrieving account numbers", err))
-		return
+	achNumbers := make([]AchNumber, len(bankDetails.Numbers))
+	for i, number := range bankDetails.Numbers {
+		achNumbers[i] = AchNumber{
+			AccountNumber: number.AccountNumber,
+			RoutingNumber: number.RoutingNumber,
+		}
 	}
-
-	if len(accountNumbers.Data) == 0 {
-		c.JSON(http.StatusNotFound, cerr.NewNotFoundError("account number not found", nil))
-		return
-	}
-
-	accountNo := accountNumbers.Data[0]
-
-	// TODO: create audit log record for accessing account details
 
 	accountDetails := AccountDetails{
-		AccountNumber: accountNo.AccountNumber,
-		RoutingNumber: accountNo.RoutingNumber,
-		Status:        string(bankAccount.Status),
+		Numbers: AccountNumbers{
+			Ach: achNumbers,
+		},
+		Status: string(bankDetails.Status),
 	}
 
 	c.JSON(http.StatusOK, accountDetails)
 }
 
 // ListAccounts - List accounts
-func ListAccounts(c *gin.Context) {
+func (api *openAPIServer) ListAccounts(c *gin.Context) {
 	limitQuery := c.DefaultQuery("limit", "100")
-	limit, err := strconv.ParseInt(limitQuery, 10, 64)
+	limit, err := strconv.Atoi(limitQuery)
 	if err != nil {
 		limit = 100
 	}
 
-	listParams := increase.AccountListParams{
-		Limit: increase.Int(limit),
+	listParams := core.ListAccountsRequest{
+		Limit:  limit,
+		UserID: auth.UserId(c),
 	}
 
 	cursor, ok := c.GetQuery("cursor")
 	if ok {
-		listParams.Cursor = increase.String(cursor)
-	} else {
-		listParams.Cursor = increase.Null[string]()
+		listParams.Cursor = cursor
 	}
 
-	// this comes from auth middleware
-	entity := c.Value("entity")
-	if entity != nil {
-		listParams.EntityID = increase.String(entity.(string))
-	}
-
-	response, err := bank.IncreaseClient.Accounts.List(c, listParams)
+	response, err := api.core.Accounts.List(c, listParams)
 	if err != nil {
-		c.JSON(http.StatusBadGateway, cerr.NewBadGatewayError("error listing accounts", err))
+		cErr := new(cerr.HttpError)
+		if errors.As(err, &cErr) {
+			c.Error(cErr)
+			return
+		}
+		c.Error(cerr.NewInternalServerError("error listing accounts", err))
 		return
 	}
 
-	accounts := make([]Account, len(response.Data))
-	for i, bankAccount := range response.Data {
+	accounts := make([]Account, len(response.Accounts))
+	for i, account := range response.Accounts {
 		accounts[i] = Account{
-			Id:        bankAccount.ID,
-			Name:      bankAccount.Name,
-			CreatedAt: bankAccount.CreatedAt,
+			Id:                    strconv.Itoa(int(account.Id)),
+			Name:                  account.Name,
+			UsBankAccountId:       *account.BankAccountId,
+			UsBankAccountNumberId: *account.BankAccountNumberId,
+			CreatedAt:             *account.CreatedAt,
 		}
 	}
 
 	accountList := AccountList{
 		Data: accounts,
 		Paging: Pagination{
-			Total: int32(len(response.Data)),
+			Total: int32(len(response.Accounts)),
 			Cursors: PaginationCursors{
 				Before: cursor,
 				After:  response.NextCursor,

@@ -1,8 +1,9 @@
-package adb
+package atomic
 
 import (
 	"bytes"
 	"encoding/json"
+	"net/http"
 	"reflect"
 	"time"
 
@@ -18,7 +19,7 @@ const (
 
 // UpsertIdempotencyKey creates a new idempotency key if one does not already exist
 // This should always be the first call whenever an idempotent request is received.
-func (db *AgapayDB) UpsertIdempotencyKey(request *IdempotentRequest) (*IdempotencyKey, error) {
+func (db *AtomicDatabaseHandle) UpsertIdempotencyKey(request *IdempotentRequest) (*IdempotencyKey, error) {
 	key := new(IdempotencyKey)
 	err := db.AtomicPhase(key, func(tx *gorm.DB) (PhaseAction, error) {
 		err := tx.Where("user_id = ? AND key = ?", request.UserId, request.IdempotencyKey).First(key).Error
@@ -61,7 +62,7 @@ func (db *AgapayDB) UpsertIdempotencyKey(request *IdempotentRequest) (*Idempoten
 		}
 
 		if !reflect.DeepEqual(keyParams, request.Params) {
-			return nil, cerr.NewConflictError("request parameters do not match", nil)
+			return nil, cerr.NewHttpError(http.StatusUnprocessableEntity, "request parameters do not match", nil)
 		}
 
 		body, err := json.Marshal(request.Body)
@@ -73,7 +74,7 @@ func (db *AgapayDB) UpsertIdempotencyKey(request *IdempotentRequest) (*Idempoten
 		keyBodyArg := bytes.ReplaceAll([]byte(key.RequestBody), []byte(" "), []byte(""))
 		if !bytes.EqualFold(requestBodyArg, keyBodyArg) {
 			db.logger.Error("request body does not match idempotent request", zap.Binary("request_body", requestBodyArg), zap.Binary("idempotent_request_body", keyBodyArg))
-			return nil, cerr.NewConflictError("request body does not match", nil)
+			return nil, cerr.NewHttpError(http.StatusUnprocessableEntity, "request body does not match", nil)
 		}
 
 		// only acquire a lock if the key is unlocked or it's lock has expired

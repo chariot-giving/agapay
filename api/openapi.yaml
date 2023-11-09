@@ -1670,12 +1670,12 @@ components:
         paging:
           $ref: '#/components/schemas/Pagination'
       type: object
-    AccountDetails:
-      description: The details of an account
+    AchNumber:
+      description: The identifying number used for making electronic transfers to
+        an account
       example:
         account_number: "1234567890"
         routing_number: "123456789"
-        status: open
       properties:
         account_number:
           description: The account number
@@ -1688,6 +1688,36 @@ components:
           example: "123456789"
           readOnly: true
           type: string
+      type: object
+    AccountNumbers:
+      description: The identifying numbers used for making electronic transfers to
+        accounts
+      example:
+        ach:
+        - account_number: "1234567890"
+          routing_number: "123456789"
+        - account_number: "1234567890"
+          routing_number: "123456789"
+      properties:
+        ach:
+          description: The ACH numbers
+          items:
+            $ref: '#/components/schemas/AchNumber'
+          type: array
+      type: object
+    AccountDetails:
+      description: The details of an account
+      example:
+        numbers:
+          ach:
+          - account_number: "1234567890"
+            routing_number: "123456789"
+          - account_number: "1234567890"
+            routing_number: "123456789"
+        status: open
+      properties:
+        numbers:
+          $ref: '#/components/schemas/AccountNumbers'
         status:
           description: The status of the account
           enum:

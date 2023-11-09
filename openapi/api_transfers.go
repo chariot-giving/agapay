@@ -11,92 +11,104 @@
 package openapi
 
 import (
+	"errors"
 	"net/http"
 	"strconv"
 
-	"github.com/chariot-giving/agapay/pkg/bank"
+	"github.com/chariot-giving/agapay/pkg/atomic"
+	"github.com/chariot-giving/agapay/pkg/auth"
 	"github.com/chariot-giving/agapay/pkg/cerr"
+	"github.com/chariot-giving/agapay/pkg/core"
 	"github.com/gin-gonic/gin"
-	"github.com/increase/increase-go"
+	"github.com/google/uuid"
+	"go.uber.org/zap"
 )
 
 // GetTransfer - Retrieve a transfer
-func GetTransfer(c *gin.Context) {
+func (api *openAPIServer) GetTransfer(c *gin.Context) {
 	id := c.Param("id")
 
-	achTransfer, err := bank.IncreaseClient.ACHTransfers.Get(c, id)
+	transfer, err := api.core.Transfers.Get(c, id)
 	if err != nil {
-		c.JSON(http.StatusBadGateway, cerr.NewBadGatewayError("error retrieving transfer", err))
+		cErr := new(cerr.HttpError)
+		if errors.As(err, &cErr) {
+			c.Error(cErr)
+			return
+		}
+		c.Error(cerr.NewInternalServerError("failed to retrieve transfer", err))
 		return
 	}
 
-	transfer := Transfer{
-		Id:            achTransfer.ID,
-		AccountId:     achTransfer.AccountID,
-		Description:   achTransfer.StatementDescriptor,
-		Amount:        achTransfer.Amount,
-		AccountNumber: achTransfer.AccountNumber,
-		RoutingNumber: achTransfer.RoutingNumber,
-		Funding:       string(achTransfer.Funding),
-		TransactionId: achTransfer.TransactionID,
-		Status:        string(achTransfer.Status),
-		CreatedAt:     achTransfer.CreatedAt,
-	}
-
-	c.JSON(http.StatusOK, &transfer)
+	c.JSON(http.StatusOK, &Transfer{
+		Id:            strconv.FormatUint(transfer.Transfer.Id, 10),
+		AccountId:     strconv.FormatUint(transfer.Transfer.AccountId, 10),
+		Description:   transfer.Transfer.Description,
+		Amount:        int64(transfer.Transfer.Amount),
+		AccountNumber: transfer.BankTransfer.AccountNumber,
+		RoutingNumber: transfer.BankTransfer.RoutingNumber,
+		Funding:       string(transfer.BankTransfer.Funding),
+		TransactionId: transfer.BankTransfer.TransactionID,
+		Status:        transfer.BankTransfer.Status,
+		CreatedAt:     *transfer.Transfer.CreatedAt,
+	})
 }
 
 // ListTransfers - List transfers
-func ListTransfers(c *gin.Context) {
+func (api *openAPIServer) ListTransfers(c *gin.Context) {
 	limitQuery := c.DefaultQuery("limit", "100")
-	limit, err := strconv.ParseInt(limitQuery, 10, 64)
+	limit, err := strconv.Atoi(limitQuery)
 	if err != nil {
 		limit = 100
 	}
 
-	accountId, ok := c.GetQuery("account_id")
+	accountIdQuery, ok := c.GetQuery("account_id")
 	if !ok {
-		c.JSON(http.StatusBadRequest, cerr.NewBadRequest("account_id is required", nil))
+		c.Error(cerr.NewBadRequest("account_id is required", nil))
 		return
 	}
-	listParams := increase.ACHTransferListParams{
-		AccountID: increase.String(accountId),
-		Limit:     increase.Int(limit),
+	accountId, err := strconv.ParseUint(accountIdQuery, 10, 64)
+	if err != nil {
+		c.Error(cerr.NewBadRequest("account_id parameter is malformed", err))
+		return
+	}
+
+	listParams := core.ListTransfersRequest{
+		UserID:    auth.UserId(c),
+		AccountID: accountId,
+		Limit:     limit,
 	}
 
 	cursor, ok := c.GetQuery("cursor")
 	if ok {
-		listParams.Cursor = increase.String(cursor)
-	} else {
-		listParams.Cursor = increase.Null[string]()
+		listParams.Cursor = cursor
 	}
 
-	response, err := bank.IncreaseClient.ACHTransfers.List(c, listParams)
+	response, err := api.core.Transfers.List(c, listParams)
 	if err != nil {
-		c.JSON(http.StatusBadGateway, cerr.NewBadGatewayError("error retrieving transfers", err))
+		cErr := new(cerr.HttpError)
+		if errors.As(err, &cErr) {
+			c.Error(cErr)
+			return
+		}
+		c.Error(cerr.NewInternalServerError("failed to list transfers", err))
 		return
 	}
 
-	transfers := make([]Transfer, len(response.Data))
-	for i, ach := range response.Data {
+	transfers := make([]Transfer, len(response.Transfers))
+	for i, transfer := range response.Transfers {
 		transfers[i] = Transfer{
-			Id:            ach.ID,
-			AccountId:     ach.AccountID,
-			Description:   ach.StatementDescriptor,
-			Amount:        ach.Amount,
-			AccountNumber: ach.AccountNumber,
-			RoutingNumber: ach.RoutingNumber,
-			Funding:       string(ach.Funding),
-			TransactionId: ach.TransactionID,
-			Status:        string(ach.Status),
-			CreatedAt:     ach.CreatedAt,
+			Id:          strconv.FormatUint(transfer.Id, 10),
+			AccountId:   strconv.FormatUint(transfer.AccountId, 10),
+			Description: transfer.Description,
+			Amount:      int64(transfer.Amount),
+			CreatedAt:   *transfer.CreatedAt,
 		}
 	}
 
 	transferList := TransferList{
 		Data: transfers,
 		Paging: Pagination{
-			Total: int32(len(response.Data)),
+			Total: int32(len(response.Transfers)),
 			Cursors: PaginationCursors{
 				Before: cursor,
 				After:  response.NextCursor,
@@ -108,31 +120,61 @@ func ListTransfers(c *gin.Context) {
 }
 
 // TransferFunds - Transfer funds
-func TransferFunds(c *gin.Context) {
+func (api *openAPIServer) TransferFunds(c *gin.Context) {
+	logger := c.Value("logger").(*zap.Logger)
+
 	transfer := new(Transfer)
-	if err := c.ShouldBindJSON(transfer); err != nil {
-		c.JSON(http.StatusBadRequest, cerr.NewBadRequest("invalid transfer", err))
-		return
-	}
-
-	achTransfer, err := bank.IncreaseClient.ACHTransfers.New(c, increase.ACHTransferNewParams{
-		AccountID:           increase.String(transfer.AccountId),
-		StatementDescriptor: increase.String(transfer.Description),
-		Amount:              increase.Int(transfer.Amount),
-		AccountNumber:       increase.String(transfer.AccountNumber),
-		RoutingNumber:       increase.String(transfer.RoutingNumber),
-		Funding:             increase.F[increase.ACHTransferNewParamsFunding](increase.ACHTransferNewParamsFunding(transfer.Funding)),
-	})
+	err := c.Bind(transfer)
 	if err != nil {
-		c.JSON(http.StatusBadGateway, cerr.NewBadGatewayError("error creating transfer", err))
+		c.Error(cerr.NewBadRequest("invalid request body", err))
 		return
 	}
 
-	transfer.Id = achTransfer.ID
-	transfer.TransactionId = achTransfer.TransactionID
-	transfer.Status = string(achTransfer.Status)
-	transfer.CreatedAt = achTransfer.CreatedAt
+	idempotencyKey := c.GetHeader("Idempotency-Key")
+	if idempotencyKey == "" {
+		idempotencyKey = uuid.NewString()
+	}
+	c.Header("Idempotency-Key", idempotencyKey)
 
-	c.Header("Location", "/transfers/"+transfer.Id)
-	c.JSON(http.StatusOK, transfer)
+	logger.Info("creating transfer", zap.String("idempotency_key", idempotencyKey))
+
+	params := make(map[string]string)
+	for _, v := range c.Params {
+		params[v.Key] = v.Value
+	}
+	request := &atomic.IdempotentRequest{
+		UserId:         auth.UserId(c),
+		IdempotencyKey: idempotencyKey,
+		Method:         c.Request.Method,
+		Path:           c.Request.URL.Path,
+		Params:         params,
+		Body:           transfer,
+	}
+
+	accountId, err := strconv.ParseUint(transfer.AccountId, 10, 64)
+	if err != nil {
+		c.Error(cerr.NewBadRequest("invalid account_id", err))
+		return
+	}
+	createTransfer := core.CreateTransferRequest{
+		AccountID:     accountId,
+		Description:   transfer.Description,
+		Amount:        transfer.Amount,
+		AccountNumber: transfer.AccountNumber,
+		RoutingNumber: transfer.RoutingNumber,
+		Funding:       transfer.Funding,
+	}
+
+	key, err := api.core.Transfers.Create(c, request, &createTransfer)
+	if err != nil {
+		cErr := new(cerr.HttpError)
+		if errors.As(err, &cErr) {
+			c.Error(cErr)
+			return
+		}
+		c.Error(cerr.NewInternalServerError("failed to create transfer", err))
+		return
+	}
+
+	c.JSON(key.ResponseCode, key.ResponseBody)
 }

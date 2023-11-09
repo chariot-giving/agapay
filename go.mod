@@ -5,14 +5,8 @@ go 1.20
 require (
 	github.com/gin-gonic/gin v1.9.1
 	github.com/google/uuid v1.4.0
-	github.com/iancoleman/strcase v0.0.0-20190422225806-e506e3ef7365
 	github.com/increase/increase-go v0.11.0
-	github.com/joho/godotenv v1.5.1
-	github.com/shopspring/decimal v1.3.1
-	github.com/steebchen/prisma-client-go v0.27.1
-	github.com/takuoki/gocase v1.0.0
 	go.uber.org/zap v1.26.0
-	golang.org/x/text v0.13.0
 	google.golang.org/grpc v1.59.0
 )
 
@@ -24,7 +18,9 @@ require (
 	github.com/jinzhu/inflection v1.0.0 // indirect
 	github.com/jinzhu/now v1.1.5 // indirect
 	github.com/rogpeppe/go-internal v1.11.0 // indirect
+	github.com/stretchr/testify v1.8.4 // indirect
 	golang.org/x/sync v0.3.0 // indirect
+	golang.org/x/text v0.13.0 // indirect
 	gorm.io/driver/mysql v1.4.7 // indirect
 )
 

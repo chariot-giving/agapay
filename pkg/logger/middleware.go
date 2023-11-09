@@ -3,6 +3,7 @@ package logger
 import (
 	"context"
 
+	"github.com/chariot-giving/agapay/pkg/telemetry"
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
 )
@@ -12,7 +13,7 @@ func LoggingMiddleware(logger *zap.Logger) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		log := logger.Named("http").With(
 			zap.String("path", c.Request.URL.Path),
-			zap.String(requestID, c.GetString(requestID)),
+			zap.String(telemetry.RequestID, c.GetString(telemetry.RequestID)),
 		)
 		log.Debug("processing request")
 		c.Set("logger", log)
