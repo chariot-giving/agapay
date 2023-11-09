@@ -87,6 +87,14 @@ make
 make test
 ```
 
+### Configure environment variables
+
+Copy the `.env.example` file to `.env` and update the values as needed.
+
+```bash
+cp .env.example .env
+```
+
 ### Run locally
 
 First run the following command to spin up the docker containers:

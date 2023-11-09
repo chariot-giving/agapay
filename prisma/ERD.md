@@ -72,6 +72,14 @@ erDiagram
     BigInt user_id FK
     DateTime created_at
 }
+"payment_intent" {
+    BigInt id PK
+    BigInt amount
+    String chariot_id "nullable"
+    String recipient_id FK
+    BigInt user_id FK
+    DateTime created_at
+}
 "transfer" {
     BigInt id PK
     BigInt amount
@@ -98,6 +106,7 @@ erDiagram
     BigInt id PK
     String account_number
     String routing_number
+    payment_rail preferred_payment_rail "nullable"
     bank_address_status status
     DateTime updated_at
 }
@@ -113,6 +122,8 @@ erDiagram
 "payment" }|--|| "recipient" : recipient
 "payment" }o--|| "idempotency_key" : idempotency_key
 "payment" }|--|| "user" : user
+"payment_intent" }|--|| "recipient" : recipient
+"payment_intent" }|--|| "user" : user
 "transfer" }|--|| "account" : account
 "transfer" }o--|| "idempotency_key" : idempotency_key
 "transfer" }|--|| "user" : user
@@ -198,6 +209,16 @@ erDiagram
   - `user_id`: 
   - `created_at`: 
 
+### `payment_intent`
+
+**Properties**
+  - `id`: 
+  - `amount`: 
+  - `chariot_id`: 
+  - `recipient_id`: 
+  - `user_id`: 
+  - `created_at`: 
+
 ### `transfer`
 
 **Properties**
@@ -230,5 +251,6 @@ erDiagram
   - `id`: 
   - `account_number`: 
   - `routing_number`: 
+  - `preferred_payment_rail`: 
   - `status`: 
   - `updated_at`: 
