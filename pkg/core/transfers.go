@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/http"
 	"strconv"
 	"time"
 
@@ -24,6 +25,9 @@ type TransfersService struct {
 func (s *TransfersService) Get(ctx context.Context, id string) (*GetTransferResponse, error) {
 	transfer := new(Transfer)
 	if err := s.db.Where("id = ?", id).First(transfer).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return nil, cerr.NewHttpError(http.StatusNotFound, "transfer not found", err)
+		}
 		return nil, err
 	}
 

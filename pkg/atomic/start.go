@@ -1,7 +1,6 @@
 package atomic
 
 import (
-	"bytes"
 	"encoding/json"
 	"net/http"
 	"reflect"
@@ -55,25 +54,26 @@ func (db *AtomicDatabaseHandle) UpsertIdempotencyKey(request *IdempotentRequest)
 			return nil, err
 		}
 
-		// programs sending multiple requestw with diff parameters but the same idempotency key is a bug
+		// programs sending multiple requests with diff parameters but the same idempotency key is a bug
 		keyParams := make(map[string]string)
 		if err := json.Unmarshal(key.RequestParams, &keyParams); err != nil {
 			return nil, err
 		}
-
 		if !reflect.DeepEqual(keyParams, request.Params) {
 			return nil, cerr.NewHttpError(http.StatusUnprocessableEntity, "request parameters do not match", nil)
 		}
 
-		body, err := json.Marshal(request.Body)
+		requestType := reflect.TypeOf(request.Body)
+		if requestType.Kind() == reflect.Ptr {
+			requestType = requestType.Elem()
+		}
+		keyBody := reflect.New(requestType).Interface()
+		err = json.Unmarshal(key.RequestBody, keyBody)
 		if err != nil {
 			return nil, err
 		}
-
-		requestBodyArg := bytes.ReplaceAll(body, []byte(" "), []byte(""))
-		keyBodyArg := bytes.ReplaceAll([]byte(key.RequestBody), []byte(" "), []byte(""))
-		if !bytes.EqualFold(requestBodyArg, keyBodyArg) {
-			db.logger.Error("request body does not match idempotent request", zap.Binary("request_body", requestBodyArg), zap.Binary("idempotent_request_body", keyBodyArg))
+		if !reflect.DeepEqual(keyBody, request.Body) {
+			db.logger.Error("request body does not match idempotent request", zap.Any("request_body", request.Body), zap.Any("idempotent_request_body", keyBody))
 			return nil, cerr.NewHttpError(http.StatusUnprocessableEntity, "request body does not match", nil)
 		}
 

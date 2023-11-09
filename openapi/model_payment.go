@@ -26,6 +26,9 @@ type Payment struct {
 	// The payment amount in USD cents. Must be a positive amount.
 	Amount int64 `json:"amount"`
 
+	// The payment rail to use for the payment. Currently only ACH and RTP is supported.
+	PaymentRail string `json:"payment_rail"`
+
 	// The identifier for the organization that will receive the payment.
 	RecipientId string `json:"recipient_id"`
 

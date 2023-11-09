@@ -5,12 +5,14 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/http"
 	"strconv"
 	"time"
 
 	"github.com/chariot-giving/agapay/pkg/atomic"
 	"github.com/chariot-giving/agapay/pkg/bank"
 	"github.com/chariot-giving/agapay/pkg/cerr"
+	"github.com/google/uuid"
 	"github.com/increase/increase-go"
 	"go.uber.org/zap"
 	"gorm.io/gorm"
@@ -23,7 +25,10 @@ type PaymentsService struct {
 
 func (s *PaymentsService) Get(ctx context.Context, id string) (*GetPaymentResponse, error) {
 	payment := new(Payment)
-	if err := s.db.Where("id = ?", id).First(payment).Error; err != nil {
+	if err := s.db.Preload("Recipient").Where("id = ?", id).First(payment).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return nil, cerr.NewHttpError(http.StatusNotFound, "payment not found", err)
+		}
 		return nil, err
 	}
 
@@ -105,6 +110,7 @@ func (s *PaymentsService) Create(ctx context.Context, req *atomic.IdempotentRequ
 				Description:      input.Description,
 				AccountId:        input.AccountID,
 				RecipientId:      input.RecipientID,
+				PaymentRail:      input.PaymentRail,
 			}
 			_, err := s.createPayment(ctx, adh, key, payment)
 			if err != nil {
@@ -194,6 +200,22 @@ func (s *PaymentsService) createBankPayment(ctx context.Context, handle *atomic.
 			return nil, err
 		}
 
+		// bank account + balance check
+		if account.BankAccountId == nil {
+			return nil, cerr.NewNotFoundError("bank account not found", nil)
+		}
+
+		balanceLookup, err := s.bank.GetAccountBalance(ctx, bank.GetAccountBalanceRequest{
+			AccountID: *account.BankAccountId,
+		})
+		if err != nil {
+			return nil, err
+		}
+
+		if balanceLookup.AvailableBalance <= payment.Amount {
+			return nil, cerr.NewBadRequest("insufficient funds", nil)
+		}
+
 		recipient := new(Recipient)
 		if err := s.db.Preload("Organization").Preload("BankAddress").Where("id = ?", payment.RecipientId).First(recipient).Error; err != nil {
 			return nil, err
@@ -208,7 +230,7 @@ func (s *PaymentsService) createBankPayment(ctx context.Context, handle *atomic.
 			AccountNumberID: *account.BankAccountNumberId,
 			Amount:          payment.Amount,
 			Description:     payment.Description,
-			Creditor:        fmt.Sprintf("%s %s", recipient.Organization.LegalName, recipient.Name),
+			Creditor:        creditorName(recipient.Name, recipient.Organization.LegalName),
 			PaymentRail:     bank.PaymentRail(payment.PaymentRail),
 			PaymentMethod: bank.PaymentMethod{
 				Ach: &bank.AchPaymentMethod{
@@ -236,6 +258,7 @@ func (s *PaymentsService) createBankPayment(ctx context.Context, handle *atomic.
 		if err := tx.Updates(payment).Error; err != nil {
 			return nil, err
 		}
+
 		return atomic.Response{Status: 201, Data: payment}, nil
 	})
 	if err != nil {
@@ -243,6 +266,13 @@ func (s *PaymentsService) createBankPayment(ctx context.Context, handle *atomic.
 	}
 
 	return payment, nil
+}
+
+func creditorName(recipientName, orgName string) string {
+	if recipientName != "" {
+		return recipientName
+	}
+	return orgName
 }
 
 func newPaymentsService(db *gorm.DB, bank bank.Bank) *PaymentsService {
@@ -256,7 +286,8 @@ type CreatePaymentRequest struct {
 	AccountID   uint64
 	Description string
 	Amount      int64
-	RecipientID uint64
+	RecipientID uuid.UUID
+	PaymentRail PaymentRail
 }
 
 type ListPaymentsRequest struct {
@@ -282,7 +313,7 @@ type Payment struct {
 	Amount           int64
 	Description      string
 	ChariotId        *string
-	RecipientId      uint64
+	RecipientId      uuid.UUID  `gorm:"column:recipient_id"`
 	Recipient        *Recipient `gorm:"foreignKey:RecipientId"`
 	PaymentRail      PaymentRail
 	BankTransferId   *string
@@ -306,7 +337,7 @@ func (p *Payment) MarshalJSON() ([]byte, error) {
 		Amount        int64       `json:"amount"`
 		Description   string      `json:"description"`
 		ChariotId     *string     `json:"chariot_id"`
-		RecipientId   uint64      `json:"recipient_id"`
+		RecipientId   string      `json:"recipient_id"`
 		PaymentRail   PaymentRail `json:"payment_rail"`
 		BankPaymentId *string     `json:"bank_transfer_id"`
 		AccountId     uint64      `json:"account_id"`
@@ -316,7 +347,7 @@ func (p *Payment) MarshalJSON() ([]byte, error) {
 		Amount:        p.Amount,
 		Description:   p.Description,
 		ChariotId:     p.ChariotId,
-		RecipientId:   p.RecipientId,
+		RecipientId:   p.RecipientId.String(),
 		PaymentRail:   p.PaymentRail,
 		BankPaymentId: p.BankTransferId,
 		AccountId:     p.AccountId,
