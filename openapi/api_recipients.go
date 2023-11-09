@@ -89,7 +89,7 @@ func (s *openAPIServer) ListRecipients(c *gin.Context) {
 	for i, recipient := range response.Recipients {
 		recipientList[i] = Recipient{
 			Id:        recipient.Id.String(),
-			Name:      recipient.Organization.LegalName,
+			Name:      recipient.Name,
 			Ein:       recipient.Organization.Ein,
 			Primary:   recipient.Primary,
 			CreatedAt: recipient.CreatedAt,

@@ -2,8 +2,10 @@ package core
 
 import (
 	"context"
+	"net/http"
 	"time"
 
+	"github.com/chariot-giving/agapay/pkg/cerr"
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
@@ -21,6 +23,9 @@ func newRecipientsService(db *gorm.DB) *RecipientsService {
 func (s *RecipientsService) Get(ctx context.Context, id string) (*Recipient, error) {
 	recipient := new(Recipient)
 	if err := s.db.Preload("Organization").Preload("BankAddress").Where("id = ?", id).First(recipient).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return nil, cerr.NewHttpError(http.StatusNotFound, "recipient not found", err)
+		}
 		return nil, err
 	}
 	return recipient, nil
@@ -30,7 +35,9 @@ func (s *RecipientsService) List(ctx context.Context, req ListRecipientsRequest)
 	recipients := make([]Recipient, 0)
 	query := s.db
 	if req.Ein != "" {
-		query = query.Joins("Organization").Where("organization.ein = ?", req.Ein)
+		query = query.Joins("Organization", query.Where("ein = ?", req.Ein)) //.Where("Organization.ein = ?", req.Ein)
+	} else {
+		query = query.Preload("Organization")
 	}
 	if req.Limit > 0 {
 		query = query.Limit(req.Limit)

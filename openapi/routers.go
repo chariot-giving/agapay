@@ -46,8 +46,8 @@ func NewRouter(server *core.AgapayServer) *gin.Engine {
 	middlewares := []gin.HandlerFunc{
 		telemetry.RequestIDMiddleware(),
 		logger.LoggingMiddleware(zap.L()),
-		auth.ApiKeyAuth(),
 		cerr.ErrorHandler(),
+		auth.ApiKeyAuth(),
 	}
 	router.Use(middlewares...)
 

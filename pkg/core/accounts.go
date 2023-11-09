@@ -30,7 +30,9 @@ func newAccountsService(db *gorm.DB, bank bank.Bank) *AccountsService {
 
 func (s *AccountsService) Create(ctx context.Context, req *atomic.IdempotentRequest, input *CreateAccountRequest) (*atomic.IdempotencyKey, error) {
 	logger := ctx.Value("logger").(*zap.Logger)
-	key, err := newIdempotencyHandler(atomic.NewAtomicDatabaseHandle(s.db, logger)).UpsertIdempotencyKey(ctx, req)
+	adh := atomic.NewAtomicDatabaseHandle(s.db, logger)
+	idempotencyHandler := newIdempotencyHandler(adh)
+	key, err := idempotencyHandler.UpsertIdempotencyKey(ctx, req)
 	if err != nil {
 		return nil, err
 	}
@@ -49,7 +51,7 @@ func (s *AccountsService) Create(ctx context.Context, req *atomic.IdempotentRequ
 				UserId:           key.UserId,
 				Name:             input.Name,
 			}
-			_, err := s.createAccount(ctx, key, account)
+			_, err := s.createAccount(ctx, adh, key, account)
 			if err != nil {
 				cErr := new(cerr.HttpError)
 				if errors.As(err, &cErr) {
@@ -59,7 +61,7 @@ func (s *AccountsService) Create(ctx context.Context, req *atomic.IdempotentRequ
 			}
 		case atomic.RecoveryPointAccountCreated:
 			// create the bank account
-			_, err := s.createBankAccount(ctx, key, account)
+			_, err := s.createBankAccount(ctx, adh, key, account)
 			if err != nil {
 				cErr := new(cerr.HttpError)
 				if errors.As(err, &cErr) {
@@ -69,7 +71,7 @@ func (s *AccountsService) Create(ctx context.Context, req *atomic.IdempotentRequ
 			}
 		case atomic.RecoveryPointBankAccountCreated:
 			// create the bank account number
-			_, err := s.createBankAccountNumber(ctx, key, account)
+			_, err := s.createBankAccountNumber(ctx, adh, key, account)
 			if err != nil {
 				cErr := new(cerr.HttpError)
 				if errors.As(err, &cErr) {
@@ -97,10 +99,8 @@ type CreateAccountRequest struct {
 }
 
 // CreateAccount creates a new account
-func (s *AccountsService) createAccount(ctx context.Context, key *atomic.IdempotencyKey, account *Account) (*Account, error) {
-	logger := ctx.Value("logger").(*zap.Logger)
-	adb := atomic.NewAtomicDatabaseHandle(s.db, logger)
-	err := adb.AtomicPhase(key, func(tx *gorm.DB) (atomic.PhaseAction, error) {
+func (s *AccountsService) createAccount(ctx context.Context, handle *atomic.AtomicDatabaseHandle, key *atomic.IdempotencyKey, account *Account) (*Account, error) {
+	err := handle.AtomicPhase(key, func(tx *gorm.DB) (atomic.PhaseAction, error) {
 		if err := tx.Create(account).Error; err != nil {
 			return nil, err
 		}
@@ -131,10 +131,8 @@ func (s *AccountsService) createAccount(ctx context.Context, key *atomic.Idempot
 }
 
 // CreateBankAccount creates a new bank account
-func (s *AccountsService) createBankAccount(ctx context.Context, key *atomic.IdempotencyKey, account *Account) (*Account, error) {
-	logger := ctx.Value("logger").(*zap.Logger)
-	adb := atomic.NewAtomicDatabaseHandle(s.db, logger)
-	err := adb.AtomicPhase(key, func(tx *gorm.DB) (atomic.PhaseAction, error) {
+func (s *AccountsService) createBankAccount(ctx context.Context, handle *atomic.AtomicDatabaseHandle, key *atomic.IdempotencyKey, account *Account) (*Account, error) {
+	err := handle.AtomicPhase(key, func(tx *gorm.DB) (atomic.PhaseAction, error) {
 		if account == nil {
 			// retrieve account if necessary (we're recovering from a recovery point)
 			if err := tx.Where("idempotency_key_id = ?", key.Id).First(account).Error; err != nil {
@@ -177,10 +175,8 @@ func (s *AccountsService) createBankAccount(ctx context.Context, key *atomic.Ide
 }
 
 // CreateBankAccount creates a new bank account
-func (s *AccountsService) createBankAccountNumber(ctx context.Context, key *atomic.IdempotencyKey, account *Account) (*Account, error) {
-	logger := ctx.Value("logger").(*zap.Logger)
-	adb := atomic.NewAtomicDatabaseHandle(s.db, logger)
-	err := adb.AtomicPhase(key, func(tx *gorm.DB) (atomic.PhaseAction, error) {
+func (s *AccountsService) createBankAccountNumber(ctx context.Context, handle *atomic.AtomicDatabaseHandle, key *atomic.IdempotencyKey, account *Account) (*Account, error) {
+	err := handle.AtomicPhase(key, func(tx *gorm.DB) (atomic.PhaseAction, error) {
 		if account == nil {
 			// retrieve account if necessary (we're recovering from a recovery point)
 			if err := tx.Where("idempotency_key_id = ?", key.Id).First(account).Error; err != nil {
@@ -226,6 +222,9 @@ func (s *AccountsService) createBankAccountNumber(ctx context.Context, key *atom
 func (s *AccountsService) Get(ctx context.Context, id string) (*Account, error) {
 	account := new(Account)
 	if err := s.db.Where("id = ?", id).First(account).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return nil, cerr.NewNotFoundError("account not found", nil)
+		}
 		return nil, err
 	}
 	return account, nil

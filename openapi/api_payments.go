@@ -29,7 +29,7 @@ func (api *openAPIServer) CreatePayment(c *gin.Context) {
 	logger := c.Value("logger").(*zap.Logger)
 
 	payment := new(Payment)
-	err := c.Bind(payment)
+	err := c.ShouldBind(payment)
 	if err != nil {
 		c.Error(cerr.NewBadRequest("invalid request body", err))
 		return
@@ -61,7 +61,7 @@ func (api *openAPIServer) CreatePayment(c *gin.Context) {
 		c.Error(cerr.NewBadRequest("invalid account_id", err))
 		return
 	}
-	recipientId, err := strconv.ParseUint(payment.RecipientId, 10, 64)
+	recipientId, err := uuid.Parse(payment.RecipientId)
 	if err != nil {
 		c.Error(cerr.NewBadRequest("invalid recipient_id", err))
 		return
@@ -71,6 +71,7 @@ func (api *openAPIServer) CreatePayment(c *gin.Context) {
 		Description: payment.Description,
 		Amount:      payment.Amount,
 		RecipientID: recipientId,
+		PaymentRail: core.PaymentRail(payment.PaymentRail),
 	}
 
 	key, err := api.core.Payments.Create(c, request, &createPayment)
@@ -102,15 +103,21 @@ func (api *openAPIServer) GetPayment(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, &Payment{
-		Id:            strconv.FormatUint(payment.Payment.Id, 10),
-		AccountId:     strconv.FormatUint(payment.Payment.AccountId, 10),
-		Description:   payment.Payment.Description,
-		Amount:        int64(payment.Payment.Amount),
-		RecipientId:   strconv.FormatUint(payment.Payment.RecipientId, 10),
-		TransactionId: payment.BankPayment.TransactionID,
-		Status:        payment.BankPayment.Status,
-	})
+	response := Payment{
+		Id:          strconv.FormatUint(payment.Payment.Id, 10),
+		AccountId:   strconv.FormatUint(payment.Payment.AccountId, 10),
+		Description: payment.Payment.Description,
+		Amount:      int64(payment.Payment.Amount),
+		RecipientId: payment.Payment.RecipientId.String(),
+		CreatedAt:   *payment.Payment.CreatedAt,
+		Status:      "not submitted",
+	}
+	if payment.BankPayment != nil {
+		response.TransactionId = payment.BankPayment.TransactionID
+		response.Status = payment.BankPayment.Status
+	}
+
+	c.JSON(http.StatusOK, &response)
 }
 
 // ListPayments - List payments

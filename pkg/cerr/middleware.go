@@ -23,13 +23,18 @@ func ErrorHandler() gin.HandlerFunc {
 				logger.Error(fmt.Sprintf("%s: %s", httpError.ErrorMsg, httpError.Message),
 					zap.Error(httpError.Details),
 					zap.Int("code", httpError.Code))
-				if sentError == nil && !c.IsAborted() {
-					c.JSON(httpError.Code, httpError)
+				if sentError == nil {
+					// status -1 doesn't overwrite existing status code
+					status := httpError.Code
+					if c.IsAborted() {
+						status = -1
+					}
+					c.JSON(status, httpError)
 					sentError = httpError
 				}
 			} else {
 				logger.Error(err.Error())
-				if sentError == nil && !c.IsAborted() {
+				if sentError == nil {
 					httpError := &HttpError{
 						Timestamp: time.Now(),
 						Code:      http.StatusInternalServerError,
@@ -38,7 +43,11 @@ func ErrorHandler() gin.HandlerFunc {
 						Details:   nil,
 					}
 					// status -1 doesn't overwrite existing status code
-					c.JSON(http.StatusInternalServerError, httpError)
+					status := httpError.Code
+					if c.IsAborted() {
+						status = -1
+					}
+					c.JSON(status, httpError)
 					sentError = err
 				}
 			}
