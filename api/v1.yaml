@@ -248,10 +248,12 @@ components:
       type: object
       description: |
         A transaction represents an individual line-item or donation for the receiving organization.
+        There can be many transactions associated with a single payment.
       required:
         - payment_account_id
         - amount
         - description
+        - payment
       properties:
         id:
           type: string
@@ -265,14 +267,26 @@ components:
         amount:
           type: integer
           format: int64
-          description: The transaction amount in USD cents. Must be a positive amount.
+          description: The transaction amount in minor currency units (cents)
           example: 10000
+        currency:
+          type: string
+          description: The currency code for the transaction
+          example: "USD"
+          default: "USD"
         description:
           type: string
           description: |
             A description of the transaction.
             Remittance information for the payment that will show on the recipient's bank statement.
           example: "Payment to Nonprofit"
+        source:
+          $ref: "#/components/schemas/TransactionSource"
+        donors:
+          type: array
+          description: The list of donors for the transaction
+          items:
+            $ref: "#/components/schemas/Donor"
         payment:
           $ref: "#/components/schemas/PaymentDetails"
         status:
@@ -298,6 +312,11 @@ components:
           description: The date and time the payment was last updated
           example: "2020-07-10 15:00:00.000"
           readOnly: true
+        metadata:
+          type: object
+          description: Additional metadata for the transaction
+          additionalProperties: 
+            type: string
     TransactionList:
       description: A list of transactions
       properties:
@@ -322,7 +341,7 @@ components:
       required:
         - method
         - reference
-        - date
+        - sent_at
       properties:
         method:
           type: string
@@ -333,7 +352,7 @@ components:
             - check
         reference:
           $ref: "#/components/schemas/PaymentReference"
-        date:
+        sent_at:
           type: string
           format: timestamp
           description: The date and time when the payment was sent
@@ -350,6 +369,10 @@ components:
       type: object
       description: The ACH payment reference for the transaction
       properties:
+        group_id:
+          type: string
+          description: The group ID is a unique identifier for the group of transactions that are sent together.
+          example: "123456789"
         originator_company_id:
           type: string
           description: An identifier for the originating company. This is generally, but not always, a stable identifier across multiple transfers.
@@ -369,10 +392,83 @@ components:
       type: object
       description: The check payment reference for the transaction
       properties:
+        carrier:
+          type: string
+          description: The carrier for the check
+          example: "USPS"
+        memo:
+          type: string
+          description: The memo for the check
+          example: "Payment to Nonprofit"
         check_number:
           type: string
           description: The check number
           example: "123456789"
+    TransactionSource:
+      type: object
+      description: |
+        This is an object that allows you to specify the source of the transaction.
+        Note that for backwards compatibility reasons, additional undocumented keys may appear in this object.
+        These should be treated as deprecated and will be removed in the future.
+      properties:
+        donor_advised_fund_grant:
+          $ref: "#/components/schemas/DonorAdvisedFundGrant"
+        corporate_match:
+          $ref: "#/components/schemas/CorporateMatch"
+    DonorAdvisedFundGrant:
+      type: object
+      description: A donor-advised fund grant is a charitable donation made by a donor-advised fund (DAF) on behalf of the donor.
+      properties:
+        organization_name:
+          type: string
+          description: The name of the DAF organization that made the grant
+          example: "Vanguard Charitable"
+        fund_name:
+          type: string
+          description: The name of the DAF fund that made the grant
+          example: "John Doe Fund"
+        purpose:
+          type: string
+          description: The purpose of the grant
+          example: "General Operating Support"
+        note:
+          type: string
+          description: A note about the grant
+          example: "This grant is for the general operating support of the organization."
+    CorporateMatch:
+      type: object
+      description: A corporate match is a charitable donation made by a corporation on behalf of an employee.
+      properties:
+        program_name:
+          type: string
+          description: The name of the corporate match program
+          example: "Matching Gifts Program"
+        company_name:
+          type: string
+          description: The name of the company that made the match
+          example: "Chariot Giving, Inc."
+        employee_name:
+          type: string
+          description: The name of the employee that requested the match
+          example: "John Doe"
+    Donor:
+      type: object
+      description: The donor information for the transaction
+      properties:
+        name:
+          type: string
+          description: The name of the donor
+          example: "John Doe"
+        email:
+          type: string
+          description: The email address of the donor
+          example: "developers@givechariot.com"
+        phone:
+          type: string
+          description: The phone number of the donor
+          example: "415-555-1212"
+        address:
+          $ref: "#/components/schemas/MailingAddress"
     Organization:
       type: object
       description: An organization is a verified nonprofit organization that can receive payments.
