@@ -1,0 +1,635 @@
+openapi: 3.0.0
+info:
+  title: Chariot Payments API
+  version: "v1"
+  description: The Chariot Payments REST API.
+  contact:
+    name: Chariot Development Team
+    url: https://www.givechariot.com/contact
+    email: developers@givechariot.com
+  termsOfService: https://www.givechariot.com/legal-nonprofit
+servers:
+  - url: https://sandboxapi.givechariot.com
+    description: Sandbox
+  - url: https://api.givechariot.com
+    description: Production
+security:
+  - bearerAuth: []
+paths:
+  /organizations:
+    get:
+      summary: List tax-exempt organizations
+      description: |
+        List tax-exempt charitable organizations.
+      operationId: listOrganizations
+      tags:
+        - organizations
+      parameters:
+        - name: ein
+          in: query
+          description: The Employer Identification Number (EIN) or TaxID for the recipient.
+          required: false
+          schema:
+            type: string
+        - name: limit
+          in: query
+          description: Limit the size of the list that is returned. The default (and maximum) is 100 objects.
+          required: false
+          schema:
+            type: integer
+            format: int32
+        - name: pageToken
+          in: query
+          description: The token to use for pagination. If not set, the first page of results will be returned.
+          required: false
+          schema:
+            type: string
+      responses:
+        "200":
+          description: The organizations were retrieved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrganizationList"
+        "400":
+          $ref: "#/components/responses/BadRequestError"
+        "401":
+          $ref: "#/components/responses/AuthenticationError"
+        "403":
+          $ref: "#/components/responses/ForbiddenError"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+  /organizations/{id}:
+    get:
+      summary: Retrieve a tax-exempt organization
+      description: |
+        Get an organization by its unique identifier.
+      operationId: getOrganization
+      tags:
+        - organizations
+      parameters:
+        - name: id
+          in: path
+          description: The unique identifier for the organization
+          required: true
+          schema:
+            type: string
+          example: "org_MJA953cFzEuO1z"
+      responses:
+        "200":
+          description: The organization was retrieved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Organization"
+        "400":
+          $ref: "#/components/responses/BadRequestError"
+        "401":
+          $ref: "#/components/responses/AuthenticationError"
+        "403":
+          $ref: "#/components/responses/ForbiddenError"
+        "404":
+          $ref: "#/components/responses/NotFoundError"
+        "409":
+          $ref: "#/components/responses/ConflictError"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+  /transactions:
+    post:
+      summary: Create a transaction
+      description: |
+        Create a transaction.
+        This endpoint is used to send transactional data to a nonprofit recipient for a payment.
+        Open payment networks that depend on the Federal Reserve are often very limited in terms of the data that can be sent with a payment.
+        This endpoint allows you to send additional data to the recipient that can be used to reconcile the payment.
+      operationId: createTransaction
+      tags:
+        - transactions
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          description: |
+            The unique identifier for the request.
+            This header is used to ensure idempotency for requests that may be retried.
+          required: false
+          schema:
+            type: string
+      requestBody:
+        description: The transaction to create
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Transaction"
+      responses:
+        "201":
+          description: The transaction was created
+          headers:
+            Location:
+              $ref: "#/components/headers/Location"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Transaction"
+        "400":
+          $ref: "#/components/responses/BadRequestError"
+        "401":
+          $ref: "#/components/responses/AuthenticationError"
+        "403":
+          $ref: "#/components/responses/ForbiddenError"
+        "409":
+          $ref: "#/components/responses/ConflictError"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+    get:
+      summary: List transactions
+      description: |
+        List transactions. 
+      operationId: listTransactions
+      tags:
+        - transactions
+      parameters:
+        - name: payment_account_id
+          in: query
+          description: The unique identifier for the payment account
+          required: false
+          schema:
+            type: string
+        - name: organization_id
+          in: query
+          description: The unique identifier for the organization
+          required: false
+          schema:
+            type: string
+        - name: limit
+          in: query
+          description: Limit the size of the list that is returned. The default (and maximum) is 100 objects.
+          required: false
+          schema:
+            type: integer
+            format: int32
+        - name: pageToken
+          in: query
+          description: The page token to use for pagination. If not set, the first page of results will be returned.
+          required: false
+          schema:
+            type: string
+      responses:
+        "200":
+          description: The transactions were retrieved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TransactionList"
+        "400":
+          $ref: "#/components/responses/BadRequestError"
+        "401":
+          $ref: "#/components/responses/AuthenticationError"
+        "403":
+          $ref: "#/components/responses/ForbiddenError"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+  /transactions/{id}:
+    get:
+      summary: Retrieve a transaction
+      description: |
+        Get a transaction by its unique identifier.
+      operationId: getTransaction
+      tags:
+        - transactions
+      parameters:
+        - name: id
+          in: path
+          description: The unique identifier for the transaction
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: The transaction was retrieved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Transaction"
+        "400":
+          $ref: "#/components/responses/BadRequestError"
+        "401":
+          $ref: "#/components/responses/AuthenticationError"
+        "403":
+          $ref: "#/components/responses/ForbiddenError"
+        "404":
+          $ref: "#/components/responses/NotFoundError"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: Opaque
+  headers:
+    X-Request-Id:
+      description: The unique identifier for the request
+      schema:
+        type: string
+    Idempotency-Key:
+      description: |
+        The unique identifier for the request.
+        This header is used to ensure idempotency for requests that may be retried.
+      schema:
+        type: string
+    Location:
+      description: The URI reference of the created object.
+      schema:
+        type: string
+        format: uri
+  schemas:
+    Transaction:
+      type: object
+      description: |
+        A transaction represents an individual line-item or donation for the receiving organization.
+      required:
+        - payment_account_id
+        - amount
+        - description
+      properties:
+        id:
+          type: string
+          description: The unique identifier for the transaction
+          example: "tx_1LaXpKGUcADgqoEMl0Cx0Ygg"
+          readOnly: true
+        payment_account_id:
+          type: string
+          description: The identifier for the organization's account that will receive the transaction.
+          example: "pac_1LaXpKGUcADgqoEMl0Cx0Ygg"
+        amount:
+          type: integer
+          format: int64
+          description: The transaction amount in USD cents. Must be a positive amount.
+          example: 10000
+        description:
+          type: string
+          description: |
+            A description of the transaction.
+            Remittance information for the payment that will show on the recipient's bank statement.
+          example: "Payment to Nonprofit"
+        payment:
+          $ref: "#/components/schemas/PaymentDetails"
+        status:
+          type: string
+          description: The status of the transaction
+          example: "pending"
+          readOnly: true
+          enum:
+            - canceled
+            - pending
+            - submitted
+            - complete
+            - rejected
+        created_at:
+          type: string
+          format: date-time
+          description: The date and time the payment was created
+          example: "2020-07-10 15:00:00.000"
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          description: The date and time the payment was last updated
+          example: "2020-07-10 15:00:00.000"
+          readOnly: true
+    TransactionList:
+      description: A list of transactions
+      properties:
+        results:
+          type: array
+          description: The list of transactions
+          items:
+            $ref: "#/components/schemas/Transaction"
+        paging:
+          type: object
+          description: The paging information
+          properties:
+            nextPageToken:
+              type: string
+              description: The token to use for pagination. If not set, the first page of results will be returned.
+              example: "eyJpZCI6IjEyMzQ1Njc4OTAiLCJ0aW1lc3RhbXAiOiIyMDIwLTA3LTEwIDE1OjAwOjAwLjAwMCJ9"
+            total:
+              type: integer
+    PaymentDetails:
+      type: object
+      description: The payment details for the transaction
+      required:
+        - method
+        - reference
+        - date
+      properties:
+        method:
+          type: string
+          description: The payment method
+          example: "ach"
+          enum:
+            - ach
+            - check
+        reference:
+          $ref: "#/components/schemas/PaymentReference"
+        date:
+          type: string
+          format: timestamp
+          description: The date and time when the payment was sent
+          example: "2020-07-10 15:00:00.000"
+    PaymentReference:
+      type: object
+      description: The payment reference for the transaction
+      properties:
+        ach:
+          $ref: "#/components/schemas/AchPaymentReference"
+        check:
+          $ref: "#/components/schemas/CheckPaymentReference"
+    AchPaymentReference:
+      type: object
+      description: The ACH payment reference for the transaction
+      properties:
+        originator_company_id:
+          type: string
+          description: An identifier for the originating company. This is generally, but not always, a stable identifier across multiple transfers.
+          example: "123456789"
+        originator_company_name:
+          type: string
+          description: The name of the originating company.
+          example: "Charitable Payer Inc."
+        trace_number:
+          type: string
+          description: |
+            A 15 digit number recorded in the Nacha file and available to both the originating and receiving bank.
+            Along with the amount, date, and originating routing number, this can be used to identify the ACH transfer at either bank.
+            ACH trace numbers are not unique, but are used to correlate returns.
+          example: "386503938889057"
+    CheckPaymentReference:
+      type: object
+      description: The check payment reference for the transaction
+      properties:
+        check_number:
+          type: string
+          description: The check number
+          example: "123456789"
+    Organization:
+      type: object
+      description: An organization is a verified nonprofit organization that can receive payments.
+      properties:
+        id:
+          type: string
+          description: The unique identifier for the organization
+          example: "org_MJA953cFzEuO1z"
+          readOnly: true
+        name:
+          type: string
+          description: The name of the organization
+          example: "Chariot Giving Network"
+        ein:
+          type: string
+          description: The Employer Identification Number (EIN) for the organization.
+          example: "123456789"
+        primary:
+          type: boolean
+          description: |
+            Indicates whether the recipient is the primary recipient for the EIN.
+            Only one recipient can be the primary recipient for an EIN.
+          example: true
+        accounts:
+          type: array
+          description: The list of payment accounts for the organization
+          items:
+            $ref: "#/components/schemas/PaymentAccount"
+        status:
+          type: string
+          description: The status of the recipient
+          readOnly: true
+          example: "verified"
+          enum:
+            - unverified
+            - verified
+        created_at:
+          type: string
+          format: date-time
+          description: The date and time the recipient was created
+          example: "2020-07-10 15:00:00.000"
+          readOnly: true
+    OrganizationList:
+      description: A list of organizations
+      properties:
+        results:
+          type: array
+          description: The list of organizations
+          items:
+            $ref: "#/components/schemas/Organization"
+        paging:
+          type: object
+          description: The paging information
+          properties:
+            nextPageToken:
+              type: string
+              description: The token to use for pagination. If not set, the first page of results will be returned.
+              example: "eyJpZCI6IjEyMzQ1Njc4OTAiLCJ0aW1lc3RhbXAiOiIyMDIwLTA3LTEwIDE1OjAwOjAwLjAwMCJ9"
+            total:
+              type: integer
+    PaymentAccount:
+      type: object
+      description: A payment account represents a channel to send both payments and corresponding data.
+      required:
+        - id
+        - email_address
+        - us_bank_account_address
+      properties:
+        id:
+          type: string
+          description: The unique identifier for the account
+          example: "pac_1LaXpKGUcADgqoEMl0Cx0Ygg"
+          readOnly: true
+        name:
+          type: string
+          description: The name of the account
+          example: "Chariot Giving Network"
+        mailing_address:
+          $ref: "#/components/schemas/MailingAddress"
+        email_address:
+          type: string
+          description: The email address
+          example: "developers@givechariot.com"
+        us_bank_account_address:
+          $ref: "#/components/schemas/UsBankAccountAddress"
+    UsBankAccountAddress:
+      type: object
+      description: The payment information for a US bank account
+      properties:
+        ach:
+          $ref: "#/components/schemas/UsBankAccountAchAddress"
+    UsBankAccountAchAddress:
+      type: object
+      description: The ACH payment information for a US bank account
+      required:
+        - account_number
+        - routing_number
+      properties:
+        account_number:
+          type: string
+          description: The account number
+          example: "884727222"
+        routing_number:
+          type: string
+          description: The American Bankers' Association (ABA) Routing Transit Number (RTN).
+          example: "123456789"
+    MailingAddress:
+      type: object
+      description: The mailing address for the account
+      required:
+        - line1
+        - city
+        - state
+        - postal_code
+        - country
+      properties:
+        line1:
+          type: string
+          description: The first line of the address
+          example: "123 Main St"
+        line2:
+          type: string
+          description: The second line of the address
+          example: "Suite 100"
+        city:
+          type: string
+          description: The city
+          example: "San Francisco"
+        state:
+          type: string
+          description: The state
+          example: "CA"
+        postal_code:
+          type: string
+          description: The postal code
+          example: "94105"
+        country:
+          type: string
+          description: The country
+          example: "US"
+    ApiError:
+      type: object
+      description: An API error
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+          description: The date and time the error occurred
+          readOnly: true
+        status:
+          type: integer
+          description: The HTTP status code
+          readOnly: true
+        error:
+          type: string
+          description: The HTTP status message
+          readOnly: true
+        message:
+          type: string
+          description: The error message
+          readOnly: true
+  responses:
+    BadRequestError:
+      description: The request is invalid or contains invalid parameters
+      headers:
+        X-Request-Id:
+          $ref: "#/components/headers/X-Request-Id"
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ApiError"
+          example:
+            timestamp: "2020-07-10 15:00:00.000"
+            code: 400
+            error: "Bad Request"
+            message: "Expected an API key to be provided in the header `x-chariot-api-key`"
+    AuthenticationError:
+      description: Unauthorized. The request is missing the security (OAuth2 Bearer token) requirements and the server is unable to verify the identify of the caller.
+      headers:
+        X-Request-Id:
+          $ref: "#/components/headers/X-Request-Id"
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ApiError"
+          example:
+            timestamp: "2020-07-10 15:00:00.000"
+            code: 401
+            error: "Unauthorized"
+            message: "Unauthorized"
+    ForbiddenError:
+      description: Access denied
+      headers:
+        X-Request-Id:
+          $ref: "#/components/headers/X-Request-Id"
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ApiError"
+          example:
+            timestamp: "2020-07-10 15:00:00.000"
+            code: 403
+            error: "Forbidden"
+            message: "User is not allowed to access this resource"
+    NotFoundError:
+      description: Resource Not Found
+      headers:
+        X-Request-Id:
+          $ref: "#/components/headers/X-Request-Id"
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ApiError"
+          example:
+            timestamp: "2020-07-10 15:00:00.000"
+            code: 404
+            error: "Not Found"
+            message: "Resource is not found"
+    ConflictError:
+      description: Resource Conflicts
+      headers:
+        X-Request-Id:
+          $ref: "#/components/headers/X-Request-Id"
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ApiError"
+          example:
+            timestamp: "2020-07-10 15:00:00.000"
+            code: 409
+            error: "Conflict"
+            message: "Request conflicts with an already existing resource"
+    GoneError:
+      description: Resource Gone or Expired
+      headers:
+        X-Request-Id:
+          $ref: "#/components/headers/X-Request-Id"
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ApiError"
+          example:
+            timestamp: "2020-07-10 15:00:00.000"
+            code: 410
+            error: "Gone"
+            message: "The resource has expired"
+    InternalServerError:
+      description: Internal Server Error
+      headers:
+        X-Request-Id:
+          $ref: "#/components/headers/X-Request-Id"
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ApiError"
+          example:
+            timestamp: "2020-07-10 15:00:00.000"
+            code: 500
+            error: "Internal server error"
+            message: "The server encountered an error processing your request"
