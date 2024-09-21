@@ -15,10 +15,10 @@ What if you could?
 
 - pay any nonprofit
 - instantly
-- through the preferred payment method of the nonprofit
-- attach data or documents to the payment
-- have fraud and compliance checks done automatically
-- and transparently track the payment through it's full lifecycle?
+- via your preferred payment network
+- without needing to maintain a database
+- have fraud, compliance, and verification checks out of the box
+- and attach data or documents to the payment
 
 In a sense, that's exactly what `Agapay` does.
 
@@ -28,7 +28,7 @@ In a sense, that's exactly what `Agapay` does.
 
 Nonprofit entities are the recipients in the `Agapay` network.
 
-To join the network, a nonprofit registers for a free account with `Chariot` and goes through a KYC process.
+To join the network, a nonprofit registers for a free account with `Chariot` and goes through a KYC and registration process.
 After they are approved and verified, they are given a bank account with a public-facing, non-sensitive
 routing and account number.
 
@@ -38,7 +38,8 @@ If a nonprofit acts as a fiscal sponsor for subsidiary organizations,
 the `Agapay` network allows each subsidiary to exist as a separate recipient with their own `Agapay` address.
 
 Additionally, the `Agapay` network allows for a single recipient to have multiple `Agapay` addresses
-if they want to share certain addresses with specific groups of payers or for other reasons like accounting purposes.
+if they want to share certain addresses with specific groups of payers or for other reasons
+like accounting purposes or fund designations.
 
 Recipients can select their preferred payment method for each `Chariot` hosted `Agapay` address.
 
@@ -48,19 +49,22 @@ Recipients can select their preferred payment method for each `Chariot` hosted `
 
 Payers are the individuals or organizations that send payments to the recipients in the `Agapay` network.
 
-To join the network, a payer registers for an account with `Chariot` and goes through a KYC process.
-After they are approved and verified, they are given an FBO (For Benefit Of) bank account.
+To join the network, a payer registers for an account with `Chariot` and goes through an onboarding process.
+After they are approved and verified, they are given API keys.
+In the future, if we wanted to support end-to-end payment solutions, we would also set up a payment account (FBO) for the payer.
 
-The payer then has 3 options to send payments to recipients:
+The payer then has 2 options to send payments to recipients:
 
-1. **Send a payment via `Agapay` API to a recipient**
- In this flow, `Chariot` processes the request and pushes the payment from the payers FBO account to the recipient's account.
-2. **Read the recipient's `Agapay` address via API and send a payment via their preferred payment method**
- In this flow, the payers read the non-sensitive account and routing numbers and create a payment intent
- for a payment that will be sent via the payers' preferred payment method.
-3. **Delegate `Agapay` API access to Accounts Payable systems**
+1. **Read the recipient's `Agapay` address via API and send a payment via their preferred payment method**
+ In this flow, the payers call the API to read the non-sensitive account and routing numbers
+ and create a payment intent for a payment that will be sent via the payers' preferred payment method.
+ This option is ideal for small-medium sized payers that manage their own Accounts Payable systems.
+2. **Delegate `Agapay` API access to Accounts Payable systems**
  In this flow, the payers delegate `Agapay` API access to their Accounts Payable systems via an OAuth application.
  The Accounts Payable systems can then read the recipient's `Agapay` address via API and send a payment via their preferred payment method.
+ Note that this method requires Chariot to offer OAuth and for charitable AP systems to have built an integration with the `Agapay` API.
+
+In the future, `Chariot` could also offer our own Accounts Payable system that is integrated with the `Agapay` API.
 
 ![Payer Onboarding Flow](./docs/assets/payer_onboarding_flow.png)
 
@@ -199,7 +203,7 @@ As part of this vision, we need to differentiate it from existing payment networ
 - **Recipient** - A recipient is a nonprofit entity that receives payments from payers.
  Recipients can be a 501(c)(3) or a fiscal sponsor for a 501(c)(3).
 - **Network Service Provider** - A network service provider is a company that provides nonprofits access to the `Agapay` network
- by offering them a public-facing payment address to receive payments.
+ by offering them a public-facing payment address to receive payments. Chariot is an example of a network service provider.
 - **Payer** - A payer is an individual or organization that sends payments to recipients.
 
 ### Entities

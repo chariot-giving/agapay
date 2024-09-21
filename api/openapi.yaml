@@ -9,8 +9,6 @@ info:
     email: developers@givechariot.com
   termsOfService: https://www.givechariot.com/legal-nonprofit
 servers:
-  - url: https://devapi.givechariot.com
-    description: Staging
   - url: https://sandboxapi.givechariot.com
     description: Sandbox
   - url: https://api.givechariot.com

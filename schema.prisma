@@ -3,12 +3,6 @@ generator client {
   output   = "./dist"
 }
 
-generator markdown {
-  provider = "prisma-markdown"
-  output   = "./prisma/ERD.md"
-  title    = "Chariot Payments"
-}
-
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
@@ -29,7 +23,7 @@ model user {
   payment_intent  payment_intent[]
 }
 
-// idemporancy_key is a table to store the idempotency keys for the API
+// idempotency_key is a table to store the idempotency keys for the API
 model idempotency_key {
   // the unique identifier for the idempotency key
   id          BigInt    @id @default(autoincrement()) @db.BigInt
@@ -217,7 +211,7 @@ model payment_intent {
   user_id      BigInt    @db.BigInt
   user         user      @relation(fields: [user_id], references: [id], onDelete: Restrict, onUpdate: Cascade, map: "fk_payment_intent_user")
   // the time the intent was created
-  created_at         DateTime         @default(now()) @db.Timestamptz(6)
+  created_at   DateTime  @default(now()) @db.Timestamptz(6)
 }
 
 // transfer represents a transfer of funds into an account
