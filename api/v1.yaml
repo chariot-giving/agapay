@@ -16,6 +16,149 @@ servers:
 security:
   - bearerAuth: []
 paths:
+  /files:
+    post:
+      summary: Create a file
+      description: |
+        Create & upload a file.
+        To upload a file to Chariot, you'll need to send a request of Content-Type multipart/form-data.
+        The request should contain the file you would like to upload, as well as the parameters for creating a file.
+      operationId: uploadFile
+      tags:
+        - files
+      requestBody:
+        description: The file to upload
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - file
+                - purpose
+              properties:
+                file:
+                  description: |
+                    The file contents.
+                    This should follow the specifications of RFC 7578 which defines file transfers for the multipart/form-data protocol.
+                  type: string
+                  format: binary
+                purpose:
+                  type: string
+                  description: |
+                    What the File will be used for. We may add additional possible values for this enum over time; 
+                    your application should be able to handle such additions gracefully.
+                    grant_letter: A grant letter
+                    tax_document: A tax document
+                    other: A file purpose not covered by any of the other cases.
+                  example: "grant_letter"
+                  enum:
+                    - grant_letter
+                    - tax_document
+                    - other
+                description:
+                  type: string
+                  description: A description of the file
+                  example: "Grant letter for the grant to the nonprofit"
+      responses:
+        "201":
+          description: The file was uploaded
+          headers:
+            Location:
+              $ref: "#/components/headers/Location"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/File"
+        "400":
+          $ref: "#/components/responses/BadRequestError"
+        "401":
+          $ref: "#/components/responses/AuthenticationError"
+        "403":
+          $ref: "#/components/responses/ForbiddenError"
+        "409":
+          $ref: "#/components/responses/ConflictError"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+    get:
+      summary: List files
+      description: |
+        List files.
+      operationId: listFiles
+      tags:
+        - files
+      parameters:
+        - name: purpose
+          in: query
+          description: The purpose of the file
+          required: false
+          schema:
+            type: string
+            enum:
+              - grant_letter
+              - tax_document
+              - other
+        - name: limit
+          in: query
+          description: Limit the size of the list that is returned. The default (and maximum) is 100 objects.
+          required: false
+          schema:
+            type: integer
+            format: int32
+        - name: pageToken
+          in: query
+          description: The token to use for pagination. If not set, the first page of results will be returned.
+          required: false
+          schema:
+            type: string
+      responses:
+        "200":
+          description: The files were retrieved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FileList"
+        "400":
+          $ref: "#/components/responses/BadRequestError"
+        "401":
+          $ref: "#/components/responses/AuthenticationError"
+        "403":
+          $ref: "#/components/responses/ForbiddenError"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+  /files/{id}:
+    get:
+      summary: Retrieve a file
+      description: |
+        Get a file by its unique identifier.
+      operationId: getFile
+      tags:
+        - files
+      parameters:
+        - name: id
+          in: path
+          description: The unique identifier for the file
+          required: true
+          schema:
+            type: string
+          example: "file_1LaXpKGUcADgqoEMl0Cx0Ygg"
+      responses:
+        "200":
+          description: The file was retrieved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/File"
+        "400":
+          $ref: "#/components/responses/BadRequestError"
+        "401":
+          $ref: "#/components/responses/AuthenticationError"
+        "403":
+          $ref: "#/components/responses/ForbiddenError"
+        "404":
+          $ref: "#/components/responses/NotFoundError"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
   /organizations:
     get:
       summary: List tax-exempt organizations
@@ -244,6 +387,78 @@ components:
         type: string
         format: uri
   schemas:
+    File:
+      type: object
+      description: |
+        Files are objects that represent a file hosted on Chariot's servers.
+        Files are uploaded by you (for example, when uploading a grant letter).
+      required:
+        - id
+        - purpose
+        - mime_type
+        - created_at
+      properties:
+        id:
+          type: string
+          description: The unique identifier for the file
+          example: "file_1LaXpKGUcADgqoEMl0Cx0Ygg"
+          readOnly: true
+        purpose:
+          type: string
+          description: |
+            What the File will be used for. We may add additional possible values for this enum over time; 
+            your application should be able to handle such additions gracefully.
+            grant_letter: A grant letter
+            tax_document: A tax document
+            other: A file purpose not covered by any of the other cases.
+          example: "grant_letter"
+          enum:
+            - grant_letter
+            - tax_document
+            - other
+        file_name:
+          type: string
+          description: The name of the file
+          example: "grant_letter.pdf"
+        mime_type:
+          type: string
+          description: The MIME type of the file
+          example: "application/pdf"
+        download_url:
+          type: string
+          description: |
+            A URL from where the File can be downloaded at this point in time.
+            The location of this URL may change over time.
+          example: "https://sandboxapi.givechariot.com/files/file_1LaXpKGUcADgqoEMl0Cx0Ygg"
+          readOnly: true
+        description:
+          type: string
+          description: A description of the file
+          example: "Grant letter for the grant to the nonprofit"
+        created_at:
+          type: string
+          format: date-time
+          description: The date and time the file was created
+          example: "2020-07-10 15:00:00.000"
+          readOnly: true
+    FileList:
+      description: A list of files
+      properties:
+        results:
+          type: array
+          description: The list of files
+          items:
+            $ref: "#/components/schemas/File"
+        paging:
+          type: object
+          description: The paging information
+          properties:
+            nextPageToken:
+              type: string
+              description: The token to use for pagination. If not set, the first page of results will be returned.
+              example: "eyJpZCI6IjEyMzQ1Njc4OTAiLCJ0aW1lc3RhbXAiOiIyMDIwLTA3LTEwIDE1OjAwOjAwLjAwMCJ9"
+            total:
+              type: integer
     Transaction:
       type: object
       description: |

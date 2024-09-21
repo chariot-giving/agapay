@@ -29,7 +29,7 @@ model user {
   payment_intent  payment_intent[]
 }
 
-// idemporancy_key is a table to store the idempotency keys for the API
+// idempotency_key is a table to store the idempotency keys for the API
 model idempotency_key {
   // the unique identifier for the idempotency key
   id          BigInt    @id @default(autoincrement()) @db.BigInt
