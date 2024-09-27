@@ -8,28 +8,28 @@
 
 ### The Problem
 
-> There are ~1.5M nonprofits in the US today that don't have an **easy** or **open** method
+There are ~1.5M nonprofits in the US today that don't have an **easy** or **open** method
 to accept payments securely and reliably via any `open-network` electronic payment method.
 
-> The IRS maintains a list of *most* tax-exempt organizations' physical addresses.
+The IRS maintains a list of *most* tax-exempt organizations' physical addresses.
 This database doesn't include many religious organizations, addresses are notoriously inaccurate,
 and the best you can do is to mail a paper check and hope for the best.
 
-> PayPal Giving Fund and PayPal Grant Payments offer convenience for charitable payments
+PayPal Giving Fund and PayPal Grant Payments offer convenience for charitable payments
 for a significant cost and vendor lock to payers and with little regard for the nonprofit experience.
 
-> Grantmakers aim to distribute funds to nonprofits in a secure, electronic, and cost-efficient manner.
+Grantmakers aim to distribute funds to nonprofits in a secure, electronic, and cost-efficient manner.
 
-> However, current practices require each grantmaker to independently establish and manage a system
+However, current practices require each grantmaker to independently establish and manage a system
 for registering electronic payment information, presenting both technical and operational challenges.
 
-> Today, these systems are a huge cost-center and resource drain for grantmakers to maintain compliance and up-to-date information
+Today, these systems are a huge cost-center and resource drain for grantmakers to maintain compliance and up-to-date information
 on all nonprofits within their systems.
 
-> Grantmakers must revert to issuing checks when nonprofits are not present in their system.
+Grantmakers must revert to issuing checks when nonprofits are not present in their system.
 Compounding the issue is the fact that every grantmaker is redundantly undertaking the same laborious technical and operational tasks.
 
-> From the perspective of nonprofits, they are required to register with over 50 grantmaker portals to receive electronic payments.
+From the perspective of nonprofits, they are required to register with over 50 grantmaker portals to receive electronic payments.
 This process involves managing numerous portals and logins, making the task of reconciling payments with their respective data exceedingly cumbersome.
 
 ### A New Approach
@@ -38,14 +38,14 @@ What if you could?
 
 - pay any nonprofit organization
 - instantly
-- via your preferred payment rail
+- via your preferred payment network
 - without needing to maintain a database
 - have fraud, compliance, and verification checks out of the box
 - and attach data or documents to the payment
 
 In a sense, that's exactly what `Agapay` does.
 
-![Agapay Network](./assets/verifiable_credentials.png)
+![Agapay Network](./docs/assets/verifiable_credentials.png)
 
 ## Concepts
 
@@ -67,11 +67,11 @@ Organizations are associated with a web domain, logo, and a set of verified addr
 
 A `Address` is a public-facing identifier that can be used to send payments to an `Organization`.
 An Organization is said to be "addressable" if it has at least one `Address`.
-An Address can take many forms depending on the type of payment rail used:
+An Address can take many forms depending on the type of payment network used:
 
 ### Postal Address
 
-A postal address is a mailing address where physical mail can be received.
+A postal address is an mailing address where physical mail can be received.
 Postal addresses are used to send paper checks.
 
 ### US Bank Account
@@ -91,7 +91,7 @@ This doesn't necessarily mean Chariot will be the only `Service Provider` in the
 ## Verifiable Credential
 
 A `Verifiable Credential` or `VC` is a digital credential that is issued to an `Organization` by a `Service Provider`.
-The `VC` proves authenticity and validity of an `Entity`, `Organization`, or `Address` and allows anyone to instantaneously verify the information presented.
+The `VC` proves authenticity and validity of an `Entity`, `Organization`, or `Address` and allows anyone instantaneously verify the information presented.
 For more information about `VC`s, see the [W3C Verifiable Credential specification](https://www.w3.org/TR/vc-data-model/).
 
 ## How it works
@@ -136,7 +136,7 @@ The payer then has 3 options to send payments to `Organizations`:
 
 1. **Read the Organization's Address via API and send a payment via their preferred payment method**
  In this flow, the payers call the API to read the public-facing `Address` identifier
- and create a payment intent for a payment that will be sent via the appropriate payment rail.
+ and create a payment intent for a payment that will be sent via the appropriate payment network.
  This option is ideal for payers that manage their own Accounts Payable systems or already have capabilities to send payments.
 2. **Delegate `Chariot` API access to Accounts Payable systems**
  In this flow, the payers delegate `Chariot` API access to their Accounts Payable systems via an OAuth application.
@@ -158,7 +158,7 @@ You can create and revoke API keys from the dashboard and should securely store 
 
 ### OpenAPI
 
-The `Chariot` API is documented using [OpenAPI](./spec/openapi.yaml).
+The `Chariot` API is documented using [OpenAPI](./api/openapi.yaml).
 This spec is in beta and subject to change. If you find it useful, or have feedback, let us know!
 
 ### Errors
