@@ -214,6 +214,13 @@ paths:
             enum:
               - postal
               - us_bank_account
+        - name: payment_methods
+          in: query
+          description: The payment methods to filter by. Comma separated list of payment method types.
+          required: false
+          schema:
+            type: string
+            example: "ach,rtp"
         - name: limit
           in: query
           description: Limit the size of the list that is returned. The default (and maximum) is 100 objects.
@@ -638,7 +645,7 @@ paths:
           $ref: "#/components/responses/NotFoundError"
         "500":
           $ref: "#/components/responses/InternalServerError"
-  
+
   /transactions:
     post:
       summary: Create a transaction
@@ -690,7 +697,7 @@ paths:
     get:
       summary: List transactions
       description: |
-        List transactions. 
+        List transactions.
       operationId: listTransactions
       tags:
         - Transactions
@@ -932,6 +939,8 @@ components:
           example: "043567500"
         physical_address:
           $ref: "#/components/schemas/PostalAddress"
+        incorporation:
+          $ref: "#/components/schemas/Incorporation"
         createdAt:
           type: string
           readOnly: true
@@ -954,6 +963,39 @@ components:
           enum:
             - active
             - inactive
+    Incorporation:
+      type: object
+      description: |-
+        An incorporation contains details about a nonprofit's incorporation status.
+      required:
+        - date
+        - state
+        - jurisdiction
+      properties:
+        date:
+          type: string
+          format: date
+          description: The date of incorporation
+          example: "2021-07-11"
+        state:
+          type: string
+          description: The 2-letter state code where the nonprofit is incorporated
+          example: "CA"
+        jurisdiction:
+          type: string
+          description: The jurisdiction where the nonprofit is incorporated
+          enum:
+            - federal
+            - state
+          example: "federal"
+        incorporation_file_id:
+          type: string
+          description: The unique identifier for the articles of incorporation file
+          example: "file_1LaXpKGUcADgqoEMl0Cx0Ygg"
+        irs_tax_exempt_letter_file_id:
+          type: string
+          description: The unique identifier for the IRS tax exempt letter file
+          example: "file_01j8ryc7cmds3e1bp5wrwvc16f"
     Person:
       type: object
       description: |-
@@ -1004,6 +1046,7 @@ components:
         - name
         - entity_id
         - affiliation
+        - domain
       properties:
         id:
           type: string
@@ -1023,6 +1066,7 @@ components:
           description: Indicates the organizational structure and relationship to other entities
           enum:
             - fiscal_sponsor
+            - parent_organization
             - independent_nonprofit
             - sponsored_organization
           example: independent_nonprofit
@@ -1030,12 +1074,8 @@ components:
           type: string
           description: The unique identifier of the parent organization, if this is a sponsored organization
           example: org_01j8rs605a4gctmbm58d87mvsk
-        web_domain:
-          type: string
-          description: |-
-            The web domain that this organization is associated with.
-            This value should not include the protocol (e.g. http:// or https://)
-          example: redcross.org
+        domain:
+          $ref: "#/components/schemas/Domain"
         logo:
           type: string
           description: The URL of the organization's logo
@@ -1049,6 +1089,8 @@ components:
           example: P50
         compliance:
           $ref: "#/components/schemas/Compliance"
+        donation_acceptance:
+          $ref: "#/components/schemas/DonationAcceptance"
         createdAt:
           type: string
           readOnly: true
@@ -1061,6 +1103,66 @@ components:
           format: date-time
           description: Time when this object was last updated. Expressed in ISO 8601 format.
           example: "2021-07-11 15:34:00.000"
+    Domain:
+      type: object
+      description: |-
+        A domain is a unique identifier for a website or web application that is associated with an organization.
+        Domains are important identity constructs that underpin the web and online interactions.
+        The domain can be used as an identifier and its validity can be asserted via DNS.
+      required:
+        - name
+      properties:
+        name:
+          type: string
+          description: The domain name
+          example: "redcross.org"
+        status:
+          type: string
+          description: The verification status of the domain
+          enum:
+            - unverified
+            - pending
+            - verified
+          example: "verified"
+        verification_method:
+          type: string
+          description: The method used to verify the domain ownership
+          enum:
+            - dns_txt
+            - dns_cname
+            - file
+          example: "dns_txt"
+        verification_token:
+          type: string
+          description: |-
+            The token used for domain verification.
+            This token must be set on a DNS TXT record at the domain's DNS server.
+          example: "chariot-verify=abc123xyz789"
+        verified_at:
+          type: string
+          format: date-time
+          description: The timestamp when the domain was verified
+          example: "2023-04-15T14:30:00Z"
+        ssl_status:
+          type: string
+          description: |-
+            The SSL certificate status for the domain.
+            This indicates if a valid SSL certificate is currently provisioned for the domain.
+          enum:
+            - none
+            - pending
+            - active
+          example: "active"
+        created_at:
+          type: string
+          format: date-time
+          description: The timestamp when the domain was added to the system
+          example: "2023-04-10T09:00:00Z"
+        updated_at:
+          type: string
+          format: date-time
+          description: The timestamp when the domain was last updated
+          example: "2023-04-15T14:30:00Z"
     Address:
       type: object
       description: |-
@@ -1073,6 +1175,7 @@ components:
         - id
         - organization_id
         - type
+        - supported_payment_methods
       properties:
         id:
           type: string
@@ -1090,6 +1193,12 @@ components:
             - us_bank_account
           description: The kind of the address
           example: us_bank_account
+        supported_payment_methods:
+          type: array
+          description: List of payment methods supported by this address
+          items:
+            $ref: "#/components/schemas/PaymentMethod"
+          example: ["ach", "rtp", "wire"]
         postal_address:
           $ref: "#/components/schemas/PostalAddress"
         us_bank_account:
@@ -1144,12 +1253,6 @@ components:
         The routing number is the American Bankers' Association (ABA) Routing Transit Number (RTN).
         The account number is an identifier specific to the receiving bank that uniquely identifies an account that can receive payments.
         Bank account addresses (account and routing numbers) can be used to send ACH, RTP, wire transfers, and FedNow payments.
-      properties:
-        ach:
-          $ref: "#/components/schemas/UsBankAccountAchAddress"
-    UsBankAccountAchAddress:
-      type: object
-      description: The ACH payment information for a US bank account address
       required:
         - account_number
         - routing_number
@@ -1171,6 +1274,8 @@ components:
         - "entity.updated"
         - "organization.created"
         - "organization.updated"
+        - "address.created"
+        - "address.updated"
     Event:
       type: object
       description: |
@@ -1393,7 +1498,7 @@ components:
         metadata:
           type: object
           description: Additional metadata for the transaction
-          additionalProperties: 
+          additionalProperties:
             type: string
     TransactionList:
       description: A list of transactions
@@ -1413,15 +1518,28 @@ components:
               example: "eyJpZCI6IjEyMzQ1Njc4OTAiLCJ0aW1lc3RhbXAiOiIyMDIwLTA3LTEwIDE1OjAwOjAwLjAwMCJ9"
             total:
               type: integer
+    PaymentMethod:
+      type: string
+      description: The method or "rails" used to make the payment
+      enum:
+        - "paper_check"
+        - "ach"
+        - "rtp"
+        - "fednow"
+        - "wire"
+      example: "ach"
     PaymentDetails:
       type: object
       description: The payment details for the transaction
       required:
         - reference
+        - payment_method
         - sent_at
       properties:
         reference:
           $ref: "#/components/schemas/PaymentReference"
+        payment_method:
+          $ref: "#/components/schemas/PaymentMethod"
         sent_at:
           type: string
           format: timestamp
@@ -1482,14 +1600,6 @@ components:
         Compliance is an object that contains legal information about the nonprofit organization.
         This information is used to comply with regulations and ensure the legitimacy of the organization.
       properties:
-        incorporation_file_id:
-          type: string
-          description: The unique identifier for the articles of incorporation file
-          example: "file_1LaXpKGUcADgqoEMl0Cx0Ygg"
-        irs_tax_exempt_letter_file_id:
-          type: string
-          description: The unique identifier for the IRS tax exempt letter file
-          example: "file_01j8ryc7cmds3e1bp5wrwvc16f"
         irs_subsection_code:
           type: string
           description: The IRS subsection code for the organization
@@ -1506,6 +1616,21 @@ components:
           type: boolean
           description: Whether the organization is listed on the OFAC list
           example: false
+    DonationAcceptance:
+      type: object
+      description: |-
+        Donation acceptance is an object that contains information about the donation acceptance policy and preferences of the nonprofit organization.
+      properties:
+        accepted_donation_types:
+          type: array
+          description: The list of donation types that are accepted by the organization
+          items:
+            $ref: "#/components/schemas/DonationType"
+        preferred_payment_methods:
+          type: array
+          description: The list of payment methods that the organization prefers to receive donations
+          items:
+            $ref: "#/components/schemas/PaymentMethod"
     Donation:
       type: object
       description: |
@@ -1513,12 +1638,21 @@ components:
         Note that for backwards compatibility reasons, additional undocumented keys may appear in this object.
         These should be treated as deprecated and will be removed in the future.
       properties:
+        type:
+          $ref: "#/components/schemas/DonationType"
         donor_advised_fund_grant:
           $ref: "#/components/schemas/DonorAdvisedFundGrant"
         corporate_match:
           $ref: "#/components/schemas/CorporateMatch"
         qualified_charitable_distribution:
           $ref: "#/components/schemas/QualifiedCharitableDistribution"
+    DonationType:
+      type: string
+      description: The type of donation
+      enum:
+        - donor_advised_fund_grant
+        - corporate_match
+        - qualified_charitable_distribution
     DonorAdvisedFundGrant:
       type: object
       description: A donor-advised fund grant is a charitable donation made by a donor-advised fund (DAF) on behalf of the donor.
@@ -1997,3 +2131,4 @@ components:
             code: 500
             error: "Internal server error"
             message: "The server encountered an error processing your request"
+
