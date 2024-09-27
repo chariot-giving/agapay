@@ -23,7 +23,7 @@ Grantmakers aim to distribute funds to nonprofits in a secure, electronic, and c
 However, current practices require each grantmaker to independently establish and manage a system
 for registering electronic payment information, presenting both technical and operational challenges.
 
-Today, these systems are a huge cost-center and resource drainfor grantmakers to maintain compliance and up-to-date information
+Today, these systems are a huge cost-center and resource drain for grantmakers to maintain compliance and up-to-date information
 on all nonprofits within their systems.
 
 Grantmakers must revert to issuing checks when nonprofits are not present in their system.
@@ -85,7 +85,7 @@ Bank account addresses (account and routing numbers) can be used to send ACH, RT
 ## Service Provider
 
 A `Service Provider` is a 3rd-party organization that issues verifiable `Addresses` to nonprofit `Organizations`.
-Chariot is the first `Service Provider` to offer `Agapay` addresses to nonprofits.
+Chariot is the first `Service Provider` to offer `Addresses` to nonprofits.
 This doesn't necessarily mean Chariot will be the only `Service Provider` in the network.
 
 ## Verifiable Credential
@@ -101,7 +101,7 @@ For more information about `VC`s, see the [W3C Verifiable Credential specificati
 To join the network, an `Organization` works with a `Service Provider` (e.g. Chariot).
 In order to onboard, the `Service Provider` needs to trust the nonprofit `Entity` and `Organization`.
 The `Service Provider` will perform KYB/KYC checks on the `Entity` and `Organization` and issue them
-public-facing `Agapay` addresses along with `Verifiable Credentials` attesting to the authenticity of the `Entity`, `Organization`, and `Address`.
+public-facing `Addresses` along with `Verifiable Credentials` attesting to the authenticity of the `Entity`, `Organization`, and `Address`.
 
 In Chariot's case, organizations are issued a `Chariot` bank account
 with public-facing, non-sensitive routing and account numbers.
