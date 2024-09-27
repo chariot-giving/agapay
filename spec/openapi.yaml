@@ -1,0 +1,3533 @@
+openapi: 3.0.0
+info:
+  title: Chariot API
+  version: "v1"
+  description: The Chariot REST API. Please see https://givechariot.readme.io/reference/overview for more details.
+  contact:
+    name: Chariot Development Team
+    url: https://www.givechariot.com/contact
+    email: partners@givechariot.com
+  termsOfService: https://www.givechariot.com/legal-nonprofit
+servers:
+  - url: https://sandboxapi.givechariot.com
+    description: Sandbox
+  - url: https://api.givechariot.com
+    description: Production
+paths:
+  /v1/nonprofit/{ein}:
+    get:
+      summary: Get nonprofit by EIN
+      description: |-
+        Retrieves a nonprofit organization by an [Employee Identification Number](https://www.irs.gov/charities-non-profits/employer-identification-number) (EIN).
+        The EIN is a unique number that identifies the organization to the Internal Revenue Service (IRS).
+
+        In the case that the organization does not exist within Chariot's system, you can create one by calling the [Create Nonprofit](/api/nonprofits/create) API endpoint.
+      operationId: get-nonprofit-by-ein
+      tags:
+        - Nonprofits
+      x-fern-audiences:
+        - fundraising
+        - payments
+      security:
+        - auth0:
+            - "read:nonprofits"
+      parameters:
+        - name: ein
+          in: path
+          description: |-
+            The unique federal employer identification number (EIN) of the nonprofit.
+            This value should be exactly 9 digits and should not contain any special characters such as dashes.
+          schema:
+            type: string
+          required: true
+          example: "530196605"
+      responses:
+        "200":
+          description: "OK"
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/X-Request-Id"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Nonprofit"
+              examples:
+                RedCross:
+                  $ref: "#/components/examples/NonprofitRedCross"
+        "400":
+          $ref: "#/components/responses/BadRequestError"
+        "401":
+          $ref: "#/components/responses/AuthenticationError"
+        "403":
+          $ref: "#/components/responses/ForbiddenError"
+        "404":
+          $ref: "#/components/responses/NotFoundError"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+  /v1/nonprofits:
+    post:
+      summary: Create nonprofit
+      description: |-
+        Create a nonprofit organization.
+
+        This is useful for integration partners to use after a nonprofit consents to use the Chariot payment option on their donation forms.
+
+        <Tip>
+        If a nonprofit does not already exist for the EIN, this will return a `201 Created` status.
+        If a nonprofit already exists for the given EIN on the system, this will return a `200 OK` status.
+        </Tip>
+
+        <Warning>
+        Handling errors:
+        - If the nonprofit does not exist within Chariot's database, a `404 Not Found` status is returned.
+        - If the nonprofit exists but does not pass Chariot's compliance checks, a `412 Precondition Failed` status is returned with a reason.
+        </Warning>
+      operationId: create-nonprofit
+      tags:
+        - Nonprofits
+      x-fern-audiences:
+        - fundraising
+        - payments
+      security:
+        - auth0:
+            - "create:nonprofits"
+      requestBody:
+        $ref: "#/components/requestBodies/CreateNonprofitRequest"
+      responses:
+        "200":
+          description: "OK"
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/X-Request-Id"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Nonprofit"
+        "201":
+          description: "Created"
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/X-Request-Id"
+            Location:
+              $ref: "#/components/headers/Location"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Nonprofit"
+        "400":
+          $ref: "#/components/responses/BadRequestError"
+        "401":
+          $ref: "#/components/responses/AuthenticationError"
+        "403":
+          $ref: "#/components/responses/ForbiddenError"
+        "404":
+          $ref: "#/components/responses/NotFoundError"
+        "412":
+          $ref: "#/components/responses/PreconditionFailedError"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+  /v1/nonprofits/{id}:
+    get:
+      summary: Get nonprofit
+      description: |-
+        Retrieves the nonprofit organization with the given ID.
+      operationId: get-nonprofit-by-id
+      tags:
+        - Nonprofits
+      x-fern-audiences:
+        - fundraising
+        - payments
+      security:
+        - auth0:
+            - "read:nonprofits"
+      parameters:
+        - name: id
+          in: path
+          description: The unique identifier for the nonprofit
+          schema:
+            type: string
+          required: true
+          example: g33ee4ee-f881-42a0-85e3-1dde7118w9k2
+      responses:
+        "200":
+          description: "OK"
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/X-Request-Id"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Nonprofit"
+              examples:
+                RedCross:
+                  $ref: "#/components/examples/NonprofitRedCross"
+        "400":
+          $ref: "#/components/responses/BadRequestError"
+        "401":
+          $ref: "#/components/responses/AuthenticationError"
+        "403":
+          $ref: "#/components/responses/ForbiddenError"
+        "404":
+          $ref: "#/components/responses/NotFoundError"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+  /v1/connects:
+    post:
+      summary: Create Connect
+      description: |-
+        Get an existing connect or create a new connect for an existing nonprofit organization.
+
+        The returned Connect can be used to integrate the client-side Chariot Connect component using the `id` property (CID) and also query for data generated from the Chariot Connect instance from the Chariot API using the `x-chariot-api-key` header parameter.
+
+        <Note>
+        Only one Connect object can be created per Nonprofit.
+        If one already exists, this will return a `200 OK` status with the existing object.
+        </Note>
+      operationId: create-connect
+      tags:
+        - Connects
+      x-fern-audiences:
+        - fundraising
+      security:
+        - auth0:
+            - "create:connects"
+      parameters:
+        - name: nonprofit
+          in: query
+          description: |-
+            The unique id of the nonprofit.
+            The format should be a v4 UUID according to RFC 4122.
+          schema:
+            type: string
+            format: uuid
+          required: true
+          example: 6af3f58e-7a80-4997-8259-770c033d7d3a
+        - name: suborganization
+          in: query
+          description: |-
+            The unique id for the suborganization within the nonprofit.
+            The format should be a v4 UUID according to RFC 4122.
+          schema:
+            type: string
+            format: uuid
+          required: false
+          example: c00d1aa2-09ab-4e76-8461-7ac34578a70c
+      requestBody:
+        $ref: "#/components/requestBodies/CreateConnectRequest"
+      responses:
+        "200":
+          description: OK
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/X-Request-Id"
+            Location:
+              $ref: "#/components/headers/Location"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Connect"
+              examples:
+                Simple:
+                  $ref: "#/components/examples/ConnectOutput"
+        "201":
+          description: Created
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/X-Request-Id"
+            Location:
+              $ref: "#/components/headers/Location"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Connect"
+              examples:
+                Simple:
+                  $ref: "#/components/examples/ConnectOutput"
+        "400":
+          $ref: "#/components/responses/BadRequestError"
+        "401":
+          $ref: "#/components/responses/AuthenticationError"
+        "403":
+          $ref: "#/components/responses/ForbiddenError"
+        "404":
+          $ref: "#/components/responses/NotFoundError"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+  /v1/connects/{id}:
+    get:
+      summary: Get Connect
+      description: |-
+        Retrieve a connect with the given ID.
+      operationId: get-connect
+      tags:
+        - Connects
+      x-fern-audiences:
+        - fundraising
+      security:
+        - auth0:
+            - "read:connects"
+      parameters:
+        - name: id
+          in: path
+          description: the unique id of the connect
+          schema:
+            type: string
+          required: true
+          example: live_xJd0lUrvpDkzeGBWZbuI2wbvEdM
+      responses:
+        "200":
+          description: "OK"
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/X-Request-Id"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Connect"
+        "400":
+          $ref: "#/components/responses/BadRequestError"
+        "401":
+          $ref: "#/components/responses/AuthenticationError"
+        "403":
+          $ref: "#/components/responses/ForbiddenError"
+        "404":
+          $ref: "#/components/responses/NotFoundError"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+  /v1/grants:
+    get:
+      summary: List Grants
+      description: |-
+        Returns a list of all grants for a given Connect. This API allows for paginating over many results.
+      operationId: list-grants
+      tags:
+        - Grants
+      x-fern-audiences:
+        - fundraising
+      security:
+        - auth0:
+            - "read:grants"
+      parameters:
+        - name: x-chariot-api-key
+          in: header
+          description: the `apiKey` of the Connect object
+          schema:
+            type: string
+          required: true
+          example: "live_xJd0lUrvpDkzeGBWZbuI2wbvEdM"
+        - name: pageLimit
+          in: query
+          description: the number of results to return; defaults to 10, max is 100
+          schema:
+            type: integer
+            default: 10
+        - name: pageToken
+          in: query
+          description: |-
+            A token to use to retrieve the next page of results. This is useful for paginating over many pages of results. If set, all other arguments are expected to be kept the same as previous calls and the value of this field should be from the nextPageToken in the previous response.
+          schema:
+            type: string
+      responses:
+        "200":
+          $ref: "#/components/responses/ListGrantsResponse"
+        "400":
+          $ref: "#/components/responses/BadRequestError"
+        "401":
+          $ref: "#/components/responses/AuthenticationError"
+        "403":
+          $ref: "#/components/responses/ForbiddenError"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+    post:
+      summary: Create Grant
+      description: |-
+        Create and submit a new grant. This should be used to capture a grant intent from an authorized DAFpay workflow session and submit the grant request to the DAF sponsor.
+
+        <Warning>
+        Error handling:
+        - The grant must be captured within 15 minutes of authorization otherwise the request will return status `410 Gone`.
+        - A grant can only be captured once from any given workflow session so any duplicate requests will return status `409 Conflict`.
+        - The amount must be in whole dollar increments (rounded to the nearest hundred) as currently DAFs only accept whole dollar grants otherwise the request will return status `400 Bad Request`.
+        - The amount must be greater than or equal to the minimum grant amount for the DAF otherwise the request will return status `400 Bad Request`.
+        - The amount must be less than or equal to the user's DAF account balance otherwise the request will return status `400 Bad Request`.
+        </Warning>
+      operationId: create-grant
+      tags:
+        - Grants
+      x-fern-audiences:
+        - fundraising
+      security:
+        - auth0:
+            - "create:grants"
+      requestBody:
+        $ref: "#/components/requestBodies/GrantCaptureRequest"
+      responses:
+        "201":
+          description: Created
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/X-Request-Id"
+            Location:
+              description: The URI reference of the created grant object.
+              schema:
+                type: string
+                format: uri
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Grant"
+              examples:
+                Simple:
+                  $ref: "#/components/examples/GrantOutput"
+        "400":
+          $ref: "#/components/responses/BadRequestError"
+        "401":
+          $ref: "#/components/responses/AuthenticationError"
+        "403":
+          $ref: "#/components/responses/ForbiddenError"
+        "404":
+          $ref: "#/components/responses/NotFoundError"
+        "409":
+          $ref: "#/components/responses/ConflictError"
+        "410":
+          $ref: "#/components/responses/GoneError"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+  /v1/grants/{id}:
+    get:
+      summary: Get Grant
+      description: |-
+        Retrieve a grant with the given ID.
+      operationId: get-grant
+      tags:
+        - Grants
+      x-fern-audiences:
+        - fundraising
+      security:
+        - auth0:
+            - "read:grants"
+      parameters:
+        - name: id
+          in: path
+          description: |-
+            The unique id of the grant.
+            The format should be a v4 UUID according to RFC 4122.
+          schema:
+            type: string
+            format: uuid
+          required: true
+          example: 10229488-08d2-4629-b70c-a2f4f4d25344
+      responses:
+        "200":
+          description: OK
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/X-Request-Id"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Grant"
+              examples:
+                Simple:
+                  $ref: "#/components/examples/GrantOutput"
+        "400":
+          $ref: "#/components/responses/BadRequestError"
+        "401":
+          $ref: "#/components/responses/AuthenticationError"
+        "403":
+          $ref: "#/components/responses/ForbiddenError"
+        "404":
+          $ref: "#/components/responses/NotFoundError"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+    patch:
+      summary: Update Grant
+      description: |-
+        Update a grant object with the given ID.
+        This can be used to update the status or acknowledgement of the grant.
+      operationId: update-grant
+      tags:
+        - Grants
+      x-fern-audiences:
+        - fundraising
+      security:
+        - auth0:
+            - "update:grants"
+      parameters:
+        - name: id
+          in: path
+          description: |-
+            The unique id of the grant.
+            The format should be a v4 UUID according to RFC 4122.
+          schema:
+            type: string
+            format: uuid
+          required: true
+          example: 10229488-08d2-4629-b70c-a2f4f4d25344
+      requestBody:
+        $ref: "#/components/requestBodies/UpdateGrantRequest"
+      responses:
+        "200":
+          description: OK
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/X-Request-Id"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Grant"
+              examples:
+                Simple:
+                  $ref: "#/components/examples/GrantOutput"
+        "400":
+          $ref: "#/components/responses/BadRequestError"
+        "401":
+          $ref: "#/components/responses/AuthenticationError"
+        "403":
+          $ref: "#/components/responses/ForbiddenError"
+        "404":
+          $ref: "#/components/responses/NotFoundError"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+  /v1/recurring_grants:
+    get:
+      summary: List Recurring Grants
+      description: |-
+        Returns a list of all recurring grants for a given Connect. This API allows for paginating over many results.
+      operationId: list-recurring-grants
+      tags:
+        - recurring_grants
+      x-fern-audiences:
+        - fundraising
+      security:
+        - auth0:
+            - "read:recurring_grants"
+      parameters:
+        - name: x-chariot-api-key
+          in: header
+          description: the `apiKey` of the Connect object
+          schema:
+            type: string
+          required: true
+          example: "live_xJd0lUrvpDkzeGBWZbuI2wbvEdM"
+        - name: pageLimit
+          in: query
+          description: the number of results to return; defaults to 10, max is 100
+          schema:
+            type: integer
+            default: 10
+        - name: pageToken
+          in: query
+          description: |-
+            A token to use to retrieve the next page of results. This is useful for paginating over many pages of results. If set, all other arguments are expected to be kept the same as previous calls and the value of this field should be from the nextPageToken in the previous response.
+          schema:
+            type: string
+      responses:
+        "200":
+          $ref: "#/components/responses/ListRecurringGrantsResponse"
+        "400":
+          $ref: "#/components/responses/BadRequestError"
+        "401":
+          $ref: "#/components/responses/AuthenticationError"
+        "403":
+          $ref: "#/components/responses/ForbiddenError"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+    post:
+      summary: Create Recurring Grant
+      description: |-
+        Create and submit a new recurring grant. This should be used to capture a recurring grant intent from an authorized DAFpay workflow session and submit the recurring grant request to the DAF sponsor.
+
+        <Warning>
+        Error handling:
+        - The recurring grant must be captured within 15 minutes of authorization otherwise the request will return status `410 Gone`.
+        - A recurring grant can only be captured once from any given workflow session so any duplicate requests will return status `409 Conflict`.
+        - The amount must be in whole dollar increments (rounded to the nearest hundred) as currently DAFs only accept whole dollar grants otherwise the request will return status `400 Bad Request`.
+        - The amount must be greater than or equal to the minimum grant amount for the DAF otherwise the request will return status `400 Bad Request`.
+        - The amount must be less than or equal to the user's DAF account balance otherwise the request will return status `400 Bad Request`.
+        </Warning>
+      operationId: create-recurring-grant
+      tags:
+        - recurring_grants
+      x-fern-audiences:
+        - fundraising
+      security:
+        - auth0:
+            - "create:recurring_grants"
+      requestBody:
+        $ref: "#/components/requestBodies/RecurringGrantCaptureRequest"
+      responses:
+        "201":
+          description: Created recurring grant
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/X-Request-Id"
+            Location:
+              description: The URI reference of the created recurring grant object.
+              schema:
+                type: string
+                format: uri
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RecurringGrant"
+              examples:
+                Simple:
+                  $ref: "#/components/examples/RecurringGrantOutput"
+        "400":
+          $ref: "#/components/responses/BadRequestError"
+        "401":
+          $ref: "#/components/responses/AuthenticationError"
+        "403":
+          $ref: "#/components/responses/ForbiddenError"
+        "404":
+          $ref: "#/components/responses/NotFoundError"
+        "409":
+          $ref: "#/components/responses/ConflictError"
+        "410":
+          $ref: "#/components/responses/GoneError"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+  /v1/recurring_grants/{id}:
+    get:
+      summary: Get Recurring Grant
+      description: |-
+        Retrieve a recurring grant with a given ID.
+      operationId: get-recurring-grant
+      tags:
+        - recurring_grants
+      x-fern-audiences:
+        - fundraising
+      security:
+        - auth0:
+            - "read:recurring_grants"
+      parameters:
+        - name: id
+          in: path
+          description: |-
+            The unique id of the recurring grant.
+            The format should be a v4 UUID according to RFC 4122.
+          schema:
+            type: string
+            format: uuid
+          required: true
+          example: 10229488-08d2-4629-b70c-a2f4f4d25344
+      responses:
+        "200":
+          description: OK
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/X-Request-Id"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RecurringGrant"
+              examples:
+                Simple:
+                  $ref: "#/components/examples/RecurringGrantOutput"
+        "400":
+          $ref: "#/components/responses/BadRequestError"
+        "401":
+          $ref: "#/components/responses/AuthenticationError"
+        "403":
+          $ref: "#/components/responses/ForbiddenError"
+        "404":
+          $ref: "#/components/responses/NotFoundError"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+  /v1/unintegrated_grants:
+    get:
+      summary: List Unintegrated Grants
+      description: |-
+        Returns a list of all unintegrated grants for a given Connect. This API allows for paginating over many results.
+      operationId: list-unintegrated-grants
+      tags:
+        - unintegrated_grants
+      x-fern-audiences:
+        - fundraising
+      security:
+        - auth0:
+            - "read:grants"
+      parameters:
+        - name: x-chariot-api-key
+          in: header
+          description: the `apiKey` of the Connect object
+          schema:
+            type: string
+          required: true
+          example: "live_xJd0lUrvpDkzeGBWZbuI2wbvEdM"
+        - name: pageLimit
+          in: query
+          description: the number of results to return; defaults to 10, max is 100
+          schema:
+            type: integer
+            default: 10
+        - name: pageToken
+          in: query
+          description: |-
+            A token to use to retrieve the next page of results. This is useful for paginating over many pages of results. If set, all other arguments are expected to be kept the same as previous calls and the value of this field should be from the nextPageToken in the previous response.
+          schema:
+            type: string
+      responses:
+        "200":
+          $ref: "#/components/responses/ListUnintegratedGrantsResponse"
+        "400":
+          $ref: "#/components/responses/BadRequestError"
+        "401":
+          $ref: "#/components/responses/AuthenticationError"
+        "403":
+          $ref: "#/components/responses/ForbiddenError"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+  /v1/unintegrated_grants/{id}:
+    get:
+      summary: Get Unintegrated Grant
+      description: |-
+        Retrieve an unintegrated grant with a given ID.
+      operationId: get-unintegrated-grant
+      tags:
+        - unintegrated_grants
+      x-fern-audiences:
+        - fundraising
+      security:
+        - auth0:
+            - "read:grants"
+      parameters:
+        - name: id
+          in: path
+          description: |-
+            The unique id of the unintegrated grant.
+            The format should be a v4 UUID according to RFC 4122.
+          schema:
+            type: string
+            format: uuid
+          required: true
+          example: 10229488-08d2-4629-b70c-a2f4f4d25344
+      responses:
+        "200":
+          description: OK
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/X-Request-Id"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnintegratedGrant"
+              examples:
+                Simple:
+                  $ref: "#/components/examples/UnintegratedGrantOutput"
+        "400":
+          $ref: "#/components/responses/BadRequestError"
+        "401":
+          $ref: "#/components/responses/AuthenticationError"
+        "403":
+          $ref: "#/components/responses/ForbiddenError"
+        "404":
+          $ref: "#/components/responses/NotFoundError"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+    patch:
+      summary: Update Unintegrated Grant
+      description: |-
+        Update an unintegrated grant object with the given ID.
+        This can be used to update the status or acknowledgement of the unintegrated grant.
+      operationId: update-unintegrated-grant
+      tags:
+        - unintegrated_grants
+      x-fern-audiences:
+        - fundraising
+      security:
+        - auth0:
+            - "update:grants"
+      parameters:
+        - name: id
+          in: path
+          description: |-
+            The unique id of the unintegrated grant.
+            The format should be a v4 UUID according to RFC 4122.
+          schema:
+            type: string
+            format: uuid
+          required: true
+          example: 10229488-08d2-4629-b70c-a2f4f4d25344
+      requestBody:
+        $ref: "#/components/requestBodies/UpdateGrantRequest"
+      responses:
+        "200":
+          description: OK
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/X-Request-Id"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnintegratedGrant"
+              examples:
+                Simple:
+                  $ref: "#/components/examples/UnintegratedGrantOutput"
+        "400":
+          $ref: "#/components/responses/BadRequestError"
+        "401":
+          $ref: "#/components/responses/AuthenticationError"
+        "403":
+          $ref: "#/components/responses/ForbiddenError"
+        "404":
+          $ref: "#/components/responses/NotFoundError"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+  /v1/dafs:
+    get:
+      summary: List Donor Advised Funds
+      description: |-
+        Returns a list of all Donor Advised Funds within Chariot's system. This API allows for paginating over many results.
+
+        <Note>
+        If there are DAFs missing from the list, please contact support at support@givechariot.com.
+        </Note>
+      operationId: list-dafs
+      tags:
+        - Donor Advised Funds
+      x-fern-audiences:
+        - fundraising
+      parameters:
+        - name: supportedOnly
+          in: query
+          description: |-
+            If set to true, filters DAFs to only those that have a direct integration with Chariot.
+          schema:
+            type: boolean
+            default: false
+        - name: query
+          in: query
+          description: |-
+            If included, filters DAFs to only those that contain the query. This parameter is case insensitive.
+          schema:
+            type: string
+        - name: pageLimit
+          in: query
+          description: the number of results to return; defaults to 10, max is 100
+          schema:
+            type: integer
+            default: 10
+        - name: pageToken
+          in: query
+          description: |-
+            A token to use to retrieve the next page of results. This is useful for paginating over many pages of results. If set, all other arguments are expected to be kept the same as previous calls.
+          schema:
+            type: string
+      responses:
+        "200":
+          $ref: "#/components/responses/ListDafsResponse"
+        "400":
+          $ref: "#/components/responses/BadRequestError"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+  /v1/dafs/{id}:
+    get:
+      summary: Get Donor Advised Fund
+      description: |-
+        Retrieve a DAF with a given ID.
+      operationId: get-daf
+      tags:
+        - Donor Advised Funds
+      x-fern-audiences:
+        - fundraising
+      parameters:
+        - name: id
+          in: path
+          description: |-
+            The unique id of the DAF.
+            The format should be a v4 UUID according to RFC 4122.
+          schema:
+            type: string
+            format: uuid
+          required: true
+          example: f9e28217-e0f7-4a54-9764-d664ffb10722
+      responses:
+        "200":
+          description: "OK"
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/X-Request-Id"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Daf"
+              examples:
+                Npt:
+                  $ref: "#/components/examples/DafOutput"
+        "400":
+          $ref: "#/components/responses/BadRequestError"
+        "404":
+          $ref: "#/components/responses/NotFoundError"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+  /v1/events:
+    get:
+      summary: List Events
+      description: |-
+        List all events corresponding to your Chariot account.
+      operationId: listEvents
+      tags:
+        - Events
+      x-fern-audiences:
+        - fundraising
+        - payments
+      security:
+        - auth0:
+            - "read:events"
+      parameters:
+        - name: limit
+          in: query
+          description: Limit the size of the list that is returned. The default (and maximum) is 100 objects.
+          required: false
+          schema:
+            type: integer
+            format: int32
+        - name: cursor
+          in: query
+          description: The cursor to use for pagination. If not set, the first page of results will be returned.
+          required: false
+          schema:
+            type: string
+        - name: category
+          in: query
+          description: |
+            Filter Events for those with the specified category.
+          required: false
+          schema:
+            $ref: "#/components/schemas/EventCategory"
+      responses:
+        "200":
+          $ref: "#/components/responses/ListEventsResponse"
+        "400":
+          $ref: "#/components/responses/BadRequestError"
+        "401":
+          $ref: "#/components/responses/AuthenticationError"
+        "403":
+          $ref: "#/components/responses/ForbiddenError"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+  /v1/events/{id}:
+    get:
+      summary: Get Event
+      description: |-
+        Retrieve an event with the given ID.
+      operationId: getEvent
+      tags:
+        - Events
+      x-fern-audiences:
+        - fundraising
+        - payments
+      security:
+        - auth0:
+            - "read:events"
+      parameters:
+        - name: id
+          in: path
+          description: The unique id for the event
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Event"
+        "400":
+          $ref: "#/components/responses/BadRequestError"
+        "401":
+          $ref: "#/components/responses/AuthenticationError"
+        "403":
+          $ref: "#/components/responses/ForbiddenError"
+        "404":
+          $ref: "#/components/responses/NotFoundError"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+  /v1/event_subscriptions:
+    post:
+      summary: Create an Event Subscription
+      description: |-
+        Create an event subscription corresponding to your Chariot account.
+      operationId: createEventSubscription
+      tags:
+        - Event Subscriptions
+      x-fern-audiences:
+        - fundraising
+        - payments
+      security:
+        - auth0:
+            - "create:event_subscriptions"
+      requestBody:
+        $ref: "#/components/requestBodies/CreateEventSubscriptionRequest"
+      responses:
+        "201":
+          description: Created
+          headers:
+            Location:
+              $ref: "#/components/headers/Location"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EventSubscription"
+        "400":
+          $ref: "#/components/responses/BadRequestError"
+        "401":
+          $ref: "#/components/responses/AuthenticationError"
+        "403":
+          $ref: "#/components/responses/ForbiddenError"
+        "404":
+          $ref: "#/components/responses/NotFoundError"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+    get:
+      summary: List Event Subscriptions
+      description: |-
+        List all event subscriptions corresponding to your Chariot account.
+      operationId: listEventSubscriptions
+      tags:
+        - Event Subscriptions
+      x-fern-audiences:
+        - fundraising
+        - payments
+      security:
+        - auth0:
+            - "read:event_subscriptions"
+      parameters:
+        - name: limit
+          in: query
+          description: Limit the size of the list that is returned. The default (and maximum) is 100 objects.
+          required: false
+          schema:
+            type: integer
+            format: int32
+        - name: cursor
+          in: query
+          description: The cursor to use for pagination. If not set, the first page of results will be returned.
+          required: false
+          schema:
+            type: string
+      responses:
+        "200":
+          $ref: "#/components/responses/ListEventSubscriptionsResponse"
+        "400":
+          $ref: "#/components/responses/BadRequestError"
+        "401":
+          $ref: "#/components/responses/AuthenticationError"
+        "403":
+          $ref: "#/components/responses/ForbiddenError"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+  /v1/event_subscriptions/{id}:
+    get:
+      summary: Get an Event Subscription
+      description: |-
+        Retrieve an event subscription with the given ID.
+      operationId: getEventSubscription
+      tags:
+        - Event Subscriptions
+      x-fern-audiences:
+        - fundraising
+        - payments
+      security:
+        - auth0:
+            - "read:event_subscriptions"
+      parameters:
+        - name: id
+          in: path
+          description: The unique identifier for the event subscription
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EventSubscription"
+        "400":
+          $ref: "#/components/responses/BadRequestError"
+        "401":
+          $ref: "#/components/responses/AuthenticationError"
+        "403":
+          $ref: "#/components/responses/ForbiddenError"
+        "404":
+          $ref: "#/components/responses/NotFoundError"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+    patch:
+      summary: Update an Event Subscription
+      description: |-
+        Update an event subscription with the given ID.
+      operationId: updateEventSubscription
+      tags:
+        - Event Subscriptions
+      security:
+        - auth0:
+            - "update:event_subscriptions"
+      parameters:
+        - name: id
+          in: path
+          description: The unique identifier for the event subscription
+          required: true
+          schema:
+            type: string
+      requestBody:
+        $ref: "#/components/requestBodies/UpdateEventSubscriptionRequest"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EventSubscription"
+        "400":
+          $ref: "#/components/responses/BadRequestError"
+        "401":
+          $ref: "#/components/responses/AuthenticationError"
+        "403":
+          $ref: "#/components/responses/ForbiddenError"
+        "404":
+          $ref: "#/components/responses/NotFoundError"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+  /files:
+    post:
+      summary: Create a file
+      description: |
+        Create & upload a file.
+        To upload a file to Chariot, you'll need to send a request of Content-Type multipart/form-data.
+        The request should contain the file you would like to upload, as well as the parameters for creating a file.
+      operationId: uploadFile
+      x-fern-audiences:
+        - payments
+      tags:
+        - files
+      security:
+        - bearerAuth: []
+      requestBody:
+        description: The file to upload
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - file
+                - purpose
+              properties:
+                file:
+                  description: |
+                    The file contents.
+                    This should follow the specifications of RFC 7578 which defines file transfers for the multipart/form-data protocol.
+                  type: string
+                  format: binary
+                purpose:
+                  type: string
+                  description: |
+                    What the File will be used for. We may add additional possible values for this enum over time; 
+                    your application should be able to handle such additions gracefully.
+                    grant_letter: A grant letter
+                    tax_document: A tax document
+                    other: A file purpose not covered by any of the other cases.
+                  example: "grant_letter"
+                  enum:
+                    - grant_letter
+                    - tax_document
+                    - other
+                description:
+                  type: string
+                  description: A description of the file
+                  example: "Grant letter for the grant to the nonprofit"
+      responses:
+        "201":
+          description: The file was uploaded
+          headers:
+            Location:
+              $ref: "#/components/headers/Location"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/File"
+        "400":
+          $ref: "#/components/responses/BadRequestError"
+        "401":
+          $ref: "#/components/responses/AuthenticationError"
+        "403":
+          $ref: "#/components/responses/ForbiddenError"
+        "409":
+          $ref: "#/components/responses/ConflictError"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+    get:
+      summary: List files
+      description: |
+        List files.
+      operationId: listFiles
+      x-fern-audiences:
+        - payments
+      tags:
+        - files
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: purpose
+          in: query
+          description: The purpose of the file
+          required: false
+          schema:
+            type: string
+            enum:
+              - grant_letter
+              - tax_document
+              - other
+        - name: limit
+          in: query
+          description: Limit the size of the list that is returned. The default (and maximum) is 100 objects.
+          required: false
+          schema:
+            type: integer
+            format: int32
+        - name: pageToken
+          in: query
+          description: The token to use for pagination. If not set, the first page of results will be returned.
+          required: false
+          schema:
+            type: string
+      responses:
+        "200":
+          description: The files were retrieved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FileList"
+        "400":
+          $ref: "#/components/responses/BadRequestError"
+        "401":
+          $ref: "#/components/responses/AuthenticationError"
+        "403":
+          $ref: "#/components/responses/ForbiddenError"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+  /files/{id}:
+    get:
+      summary: Retrieve a file
+      description: |
+        Get a file by its unique identifier.
+      operationId: getFile
+      x-fern-audiences:
+        - payments
+      tags:
+        - files
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          description: The unique identifier for the file
+          required: true
+          schema:
+            type: string
+          example: "file_1LaXpKGUcADgqoEMl0Cx0Ygg"
+      responses:
+        "200":
+          description: The file was retrieved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/File"
+        "400":
+          $ref: "#/components/responses/BadRequestError"
+        "401":
+          $ref: "#/components/responses/AuthenticationError"
+        "403":
+          $ref: "#/components/responses/ForbiddenError"
+        "404":
+          $ref: "#/components/responses/NotFoundError"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+  /accounts:
+    get:
+      summary: List accounts
+      description: |
+        Returns a list of accounts.
+      operationId: listAccounts
+      tags:
+        - Accounts
+      x-fern-audiences:
+        - payments
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: ein
+          in: query
+          description: The Employer Identification Number (EIN) or TaxID for the recipient.
+          required: false
+          schema:
+            type: string
+        - name: limit
+          in: query
+          description: Limit the size of the list that is returned. The default (and maximum) is 100 objects.
+          required: false
+          schema:
+            type: integer
+            format: int32
+        - name: pageToken
+          in: query
+          description: The token to use for pagination. If not set, the first page of results will be returned.
+          required: false
+          schema:
+            type: string
+      responses:
+        "200":
+          description: The accounts were retrieved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AccountList"
+        "400":
+          $ref: "#/components/responses/BadRequestError"
+        "401":
+          $ref: "#/components/responses/AuthenticationError"
+        "403":
+          $ref: "#/components/responses/ForbiddenError"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+  /accounts/{id}:
+    get:
+      summary: Retrieve an account.
+      description: |
+        Get an account by its unique identifier.
+      operationId: getAccount
+      tags:
+        - Accounts
+      x-fern-audiences:
+        - payments
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          description: The unique identifier for the account
+          required: true
+          schema:
+            type: string
+          example: "acc_1LaXpKGUcADgqoEMl0Cx0Ygg"
+      responses:
+        "200":
+          description: The account was retrieved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Account"
+        "400":
+          $ref: "#/components/responses/BadRequestError"
+        "401":
+          $ref: "#/components/responses/AuthenticationError"
+        "403":
+          $ref: "#/components/responses/ForbiddenError"
+        "404":
+          $ref: "#/components/responses/NotFoundError"
+        "409":
+          $ref: "#/components/responses/ConflictError"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+  /transactions:
+    post:
+      summary: Create a transaction
+      description: |
+        This endpoint is used to send transactional data to a nonprofit account for a payment that happens outside of Chariot.
+        Open payment networks that depend on the Federal Reserve are often very limited in terms of the data that can be sent with a payment.
+        This endpoint allows you to send additional data to the account that can be used to reconcile the payment.
+      operationId: createTransaction
+      tags:
+        - Transactions
+      x-fern-audiences:
+        - payments
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          description: |
+            The unique identifier for the request.
+            This header is used to ensure idempotency for requests that may be retried.
+          required: false
+          schema:
+            type: string
+      requestBody:
+        description: The transaction to create
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Transaction"
+      responses:
+        "201":
+          description: The transaction was created
+          headers:
+            Location:
+              $ref: "#/components/headers/Location"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Transaction"
+        "400":
+          $ref: "#/components/responses/BadRequestError"
+        "401":
+          $ref: "#/components/responses/AuthenticationError"
+        "403":
+          $ref: "#/components/responses/ForbiddenError"
+        "409":
+          $ref: "#/components/responses/ConflictError"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+    get:
+      summary: List transactions
+      description: |
+        List transactions. 
+      operationId: listTransactions
+      tags:
+        - Transactions
+      x-fern-audiences:
+        - payments
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: account_id
+          in: query
+          description: The unique identifier for the account
+          required: false
+          schema:
+            type: string
+        - name: nonprofit_id
+          in: query
+          description: The unique identifier for the nonprofit
+          required: false
+          schema:
+            type: string
+        - name: limit
+          in: query
+          description: Limit the size of the list that is returned. The default (and maximum) is 100 objects.
+          required: false
+          schema:
+            type: integer
+            format: int32
+        - name: pageToken
+          in: query
+          description: The page token to use for pagination. If not set, the first page of results will be returned.
+          required: false
+          schema:
+            type: string
+      responses:
+        "200":
+          description: The transactions were retrieved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TransactionList"
+        "400":
+          $ref: "#/components/responses/BadRequestError"
+        "401":
+          $ref: "#/components/responses/AuthenticationError"
+        "403":
+          $ref: "#/components/responses/ForbiddenError"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+  /transactions/{id}:
+    get:
+      summary: Retrieve a transaction
+      description: |
+        Get a transaction by its unique identifier.
+      operationId: getTransaction
+      tags:
+        - Transactions
+      x-fern-audiences:
+        - payments
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          description: The unique identifier for the transaction
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: The transaction was retrieved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Transaction"
+        "400":
+          $ref: "#/components/responses/BadRequestError"
+        "401":
+          $ref: "#/components/responses/AuthenticationError"
+        "403":
+          $ref: "#/components/responses/ForbiddenError"
+        "404":
+          $ref: "#/components/responses/NotFoundError"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+  /payments:
+    post:
+      summary: Create a payment
+      description: |
+        Create a payment to send money to a nonprofit account.
+        In order to use this endpoint, you must be a registered Chariot Payments partner.
+      operationId: createPayment
+      tags:
+        - Payments
+      security:
+        - bearerAuth: []
+      x-fern-audiences:
+        - payments
+      requestBody:
+        description: The payment to create
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Payment"
+      responses:
+        "201":
+          description: The payment was created
+          headers:
+            Location:
+              $ref: "#/components/headers/Location"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Payment"
+        "400":
+          $ref: "#/components/responses/BadRequestError"
+        "401":
+          $ref: "#/components/responses/AuthenticationError"
+        "403":
+          $ref: "#/components/responses/ForbiddenError"
+        "409":
+          $ref: "#/components/responses/ConflictError"
+    get:
+      summary: List payments
+      description: |
+        Returns a list of payments.
+      operationId: listPayments
+      tags:
+        - Payments
+      security:
+        - bearerAuth: []
+      x-fern-audiences:
+        - payments
+      parameters:
+        - name: account_id
+          in: query
+          description: The unique identifier for the account
+          required: true
+          schema:
+            type: string
+          example: "acc_1LaXpKGUcADgqoEMl0Cx0Ygg"
+        - name: limit
+          in: query
+          description: Limit the size of the list that is returned. The default (and maximum) is 100 objects.
+          required: false
+          schema:
+            type: integer
+            format: int32
+        - name: cursor
+          in: query
+          description: The cursor to use for pagination. If not set, the first page of results will be returned.
+          required: false
+          schema:
+            type: string
+      responses:
+        "200":
+          description: The payments were retrieved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaymentList"
+        "400":
+          $ref: "#/components/responses/BadRequestError"
+        "401":
+          $ref: "#/components/responses/AuthenticationError"
+        "403":
+          $ref: "#/components/responses/ForbiddenError"
+        "409":
+          $ref: "#/components/responses/ConflictError"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+  /payments/{id}:
+    get:
+      summary: Retrieve a payment
+      description: |
+        Get a payment by its unique identifier.
+        This endpoint is used to retrieve a payment by its unique identifier.
+      operationId: getPayment
+      tags:
+        - Payments
+      security:
+        - bearerAuth: []
+      x-fern-audiences:
+        - payments
+      parameters:
+        - name: id
+          in: path
+          description: The unique identifier for the payment
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: The payment was retrieved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Payment"
+        "400":
+          $ref: "#/components/responses/BadRequestError"
+        "401":
+          $ref: "#/components/responses/AuthenticationError"
+        "403":
+          $ref: "#/components/responses/ForbiddenError"
+        "404":
+          $ref: "#/components/responses/NotFoundError"
+        "409":
+          $ref: "#/components/responses/ConflictError"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+components:
+  securitySchemes:
+    auth0:
+      type: oauth2
+      description: This API uses OAuth2 with the client credentials flow.
+      flows:
+        clientCredentials:
+          tokenUrl: https://login.givechariot.com/oauth/token
+          scopes:
+            "create:nonprofits": create a nonprofit and user
+            "read:nonprofits": read all nonprofits
+            "create:connects": create any connect, principle does not need to be associated with nonprofit
+            "read:connects": read all connects for a nonprofit
+            "create:grants": create a grant from a workflow session
+            "read:grants": "read grants"
+            "update:grants": "update grants"
+            "read:events": "read events"
+            "create:event_subscriptions": "create event subscriptions"
+            "read:event_subscriptions": "read event subscriptions"
+            "update:event_subscriptions": "update event subscriptions"
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: Opaque
+  schemas:
+    Nonprofit:
+      type: object
+      description: |-
+        A Nonprofit represents a registered 501(c)(3) charitable organization in good standing with the IRS.
+      required:
+        - id
+        - name
+        - ein
+      properties:
+        id:
+          type: string
+          readOnly: true
+          description: The unique identifier for the object.
+          example: g33ee4ee-f881-42a0-85e3-1dde7118w9k2
+        name:
+          type: string
+          description: The IRS registered name of the nonprofit organization
+          example: Leading for Children
+        preferredName:
+          type: string
+          description: |-
+            The preferred name of the nonprofit organization. This is the name that shows up on the nonprofit's dashboard and Connect modal. This is useful for nonprofits that are known by a different name to donors and don't use their IRS registered name publicly.
+          example: LfC
+        ein:
+          type: string
+          description: The US federal employer identification number (Tax ID); unique on the system. This value should be exactly 9 digits and should not contain any special characters such as dashes.
+          example: "043567500"
+        suborganizations:
+          type: array
+          items:
+            $ref: "#/components/schemas/Suborganization"
+          description: |-
+            The list of suborganizations associated with this nonprofit.
+            Suborganizations are useful for nonprofits that have multiple chapters or locations.
+        address:
+          $ref: "#/components/schemas/Address"
+        picture:
+          type: string
+          description: The URI of the nonprofit's logo
+        website:
+          type: string
+          description: The URL of the nonprofit's website
+        createdAt:
+          type: string
+          readOnly: true
+          format: date-time
+          description: Time when this object was created. Expressed in ISO 8601 format.
+          example: "2020-07-10 15:00:00.000"
+        updatedAt:
+          type: string
+          readOnly: true
+          format: date-time
+          description: Time when this object was last updated. Expressed in ISO 8601 format.
+          example: "2021-07-11 15:34:00.000"
+        isDafPayNetwork:
+          type: boolean
+          readOnly: true
+          description: |-
+            A flag to indicate if the nonprofit will receive grants through the DAFPay Network.
+            Grants processing through the DAFPay Network will be sent to the DAFPay Network 501(c)(3) non-profit organization (EIN: 93-1372175).
+            The DAFPay Network will then review and process the grant and send the funds to the nonprofit.
+            Grants processed outside the DAFPay Network will be sent directly to the nonprofit.
+          example: false
+        inGoodStanding:
+          type: boolean
+          readOnly: true
+          description: |-
+            A flag to indicate if the nonprofit is in good standing with the IRS.
+            If the nonprofit is a tax-exempt 501(c)(3) Public Charity in good standing with the IRS, this field should be true.
+            This status can change over time and is kept up-to-date by Chariot.
+            Regardless of the value of this field, Connects can still be created for the nonprofit,
+            however the nonprofit will not be able to receive grants through Chariot if this field is false.
+            If you believe the value of this field is incorrect for a Nonprofit, please contact the Chariot team.
+          example: true
+        claimed:
+          type: boolean
+          readOnly: true
+          description: |-
+            A flag to indicate if the nonprofit has been claimed by a user.
+            A nonprofit is claimed if a user signs up for a Chariot account with
+            this nonprofit and is verified by the Chariot team.
+    Suborganization:
+      type: object
+      description: |-
+        A suborganization represents an organization that is under the umbrella of a parent EIN.
+        This is common for nonprofits that have multiple chapters or locations or operate as a fiscal sponsor.
+      required:
+        - id
+        - name
+        - ein
+      properties:
+        id:
+          type: string
+          readOnly: true
+          description: The unique identifier for the object.
+          example: g33ee4ee-f881-42a0-85e3-1dde7118w9k2
+        name:
+          type: string
+          description: The registered name of the suborganization
+          example: Leading for Children
+        preferredName:
+          type: string
+          description: |-
+            The preferred name of the suborganization. This is the name that shows up on the nonprofit's dashboard and Connect modal. This is useful for nonprofits that are known by a different name to donors and don't use their IRS registered name publicly.
+          example: LfC
+        address:
+          $ref: "#/components/schemas/Address"
+        picture:
+          type: string
+          description: The URI of the nonprofit's logo
+        website:
+          type: string
+          description: The URL of the nonprofit's website
+        createdAt:
+          type: string
+          readOnly: true
+          format: date-time
+          description: Time when this object was created. Expressed in ISO 8601 format.
+          example: "2020-07-10 15:00:00.000"
+        updatedAt:
+          type: string
+          readOnly: true
+          format: date-time
+          description: Time when this object was last updated. Expressed in ISO 8601 format.
+          example: "2021-07-11 15:34:00.000"
+    Connect:
+      type: object
+      description: |-
+        A Connect represents an instance of Chariot Connect for a particular Nonprofit. A nonprofit organization will create Connect objects in order to integrate Chariot Connect into their websites or fundraising platforms to start accepting donations directly from Donor Advised Funds. Each Nonprofit can have multiple Connect objects where each one represents a logical separation for how the organization wants to organize their sources of donations. For example, they might have 2 Connect instances, one that they use to integrate Chariot Connect directly on their website and the other that they provide to a 3rd party fundraising platform. On the client side, Chariot Connect is instantiated with the `id` of the Connect object, also called the `cid`. A connect object also contains an `apiKey`. This is useful for nonprofits to provide to fundraising platforms on their behalf to programatically integrate Chariot Connect and access resources and information created from the Connect instance through various Chariot API endpoints. More information on integrating Chariot Connect into a client-side application can be found here: https://givechariot.readme.io
+      required:
+        - id
+        - apiKey
+      properties:
+        id:
+          type: string
+          readOnly: true
+          description: |-
+            The unique identifier for this object. This is also the 'publishable' cid to use for initializing Connect for client-side integration.
+          example: test_connect123
+        name:
+          type: string
+          description: A human readable name for the connect, optional.
+          example: website
+        apiKey:
+          type: string
+          readOnly: true
+          description: A secure token that can be used to make M2M API calls to read data generated by this object.
+          example: test_apiTokenABC
+        active:
+          type: boolean
+          description: |-
+            A flag to indicate if this connect is active. If true, then this Connect can process donations and grants, otherwise this Connect cannot process grants.
+          example: true
+        createdAt:
+          type: string
+          readOnly: true
+          format: date-time
+          description: Time when this object was created. Expressed in ISO 8601 format.
+          example: "2020-07-10 15:00:00.000"
+        updatedAt:
+          type: string
+          readOnly: true
+          format: date-time
+          description: Time when this object was last updated. Expressed in ISO 8601 format.
+          example: "2021-07-11 15:34:00.000"
+        createdBy:
+          type: string
+          readOnly: true
+          description: ID of the user who created this object.
+          example: auth0-user-id-123
+        archived:
+          type: boolean
+          readOnly: true
+          description: A flag to indicate if this object is marked for deletion.
+          example: false
+        metadata:
+          type: object
+          description: A map of arbitrary string keys and values to store information about the object.
+          additionalProperties:
+            type: string
+    Daf:
+      type: object
+      description: |-
+        A Donor-Advised Fund, or `DAF` for short, is a special-purpose, tax-advantaged charitable account.
+        For more information, please see the [IRS website](https://www.irs.gov/charities-non-profits/charitable-organizations/donor-advised-funds) for a full description.
+        In the case that a DAF is supported, a donor will be able to initiate a grant directly through DAFpay.
+      required:
+        - id
+        - orgName
+        - address
+        - address2
+        - city
+        - state
+        - zip
+        - supported
+        - minimumGrantAmount
+        - institutionDown
+      properties:
+        id:
+          type: string
+          readOnly: true
+          description: The unique identifier for this object.
+          example: 0bf40881-8ee2-47fb-98ca-f58c7999aa34
+        orgName:
+          type: string
+          readOnly: true
+          description: A human readable name for the DAF.
+          example: website
+        address:
+          type: string
+          readOnly: true
+          description: The first address line.
+          example: 123 Main St.
+        address2:
+          type: string
+          readOnly: true
+          description: The second address line.
+          example: Apt 100
+        city:
+          type: string
+          readOnly: true
+          description: The city name for the address.
+          example: New York City
+        state:
+          type: string
+          readOnly: true
+          description: The state name for the address.
+          example: New York
+        zip:
+          type: string
+          readOnly: true
+          description: The zipcode for the address.
+          example: "12345"
+        supported:
+          type: boolean
+          readOnly: true
+          description: A flag to indicate if this DAF is supported by DAFpay.
+          example: false
+        minimumGrantAmount:
+          type: number
+          readOnly: true
+          description: The minimum grant amount in cents allowed for this DAF.
+          example: 5000
+        institutionDown:
+          type: boolean
+          readOnly: true
+          description: A flag to indicate if the institution is down.
+          example: false
+    Grant:
+      type: object
+      description: |-
+        A Grant represents a successfully initiated grant request with a Donor Advised Fund. Grants are created when a person interacts with an instance of Chariot Connect and successfully submits a grant and completes the workflow. There can be many grants associated with a Connect object and therefore a Nonprofit.
+      required:
+        - id
+        - workflowSessionId
+        - fundId
+        - amount
+      properties:
+        id:
+          type: string
+          readOnly: true
+          description: The unique identifier for the object
+          format: uuid
+          example: cfe09e64-6a74-4dab-a565-361185a6f248
+        userFriendlyId:
+          type: string
+          readOnly: true
+          description: Often referred to as the "Chariot ID", this is the ID that will be included in the payment from the DAF provider.
+          example: chariot-1234455
+          deprecated: true
+        trackingId:
+          type: string
+          readOnly: true
+          description: The tracking ID for the grant
+          example: L9E182VBGP
+        workflowSessionId:
+          type: string
+          readOnly: true
+          description: ID of the Connect Workflow Session associated with this grant
+          format: uuid
+          example: 2d4b2a43-a5b4-4be1-ad1f-f932016ca4a6
+        fundId:
+          type: string
+          readOnly: true
+          description: ID of the donor advised fund
+          example: daf-id
+        externalGrantId:
+          type: string
+          description: ID of the grant associated with the donor advised fund
+          example: 897823sdjf8sfjs
+        createdAt:
+          type: string
+          readOnly: true
+          format: date-time
+          description: Time when this object was created; expressed in ISO 8601 format
+          example: "2020-07-10 15:00:00.000"
+        updatedAt:
+          type: string
+          readOnly: true
+          format: date-time
+          description: Time when this object was last updated; expressed in ISO 8601 format
+          example: "2021-07-11 15:34:00.000"
+        amount:
+          type: number
+          format: integer
+          description: The grant amount expressed in units of whole cents
+          example: 15000
+        status:
+          type: string
+          description: The status of the grant
+          example: Initiated
+        feeDetail:
+          type: object
+          readOnly: true
+          description: The fee detail of the grant
+          properties:
+            total:
+              type: number
+              format: integer
+              description: The total fee amount expressed in units of cents
+              example: 1500
+            contributions:
+              type: array
+              items:
+                $ref: "#/components/schemas/ContributionFeeDetail"
+              description: The list of fee contributions for this grant
+        metadata:
+          type: object
+          description: A map of arbitrary string keys and values to store information about the object
+          additionalProperties:
+            type: string
+        firstName:
+          type: string
+          description: The donor's first name
+          example: "Warren"
+        lastName:
+          type: string
+          description: The donor's last name
+          example: "Buffet"
+        phone:
+          type: string
+          description: The donor's phone number
+          example: "1237861020"
+        email:
+          type: string
+          description: The donor's email
+          example: "warrenBuffet@example.com"
+        note:
+          type: string
+          description: An note inputted by the user at submisson
+          example: "Please dedicate in memory of grandma"
+        statuses:
+          type: array
+          items:
+            $ref: "#/components/schemas/GrantStatus"
+          description: The list of grant statuses for this grant
+        paymentChannel:
+          type: string
+          readOnly: true
+          description: |-
+            The payment channel for the grant. This is useful to know how the grant will be sent.
+            The payment channel will be one of the following:
+            - dafpay_network: Grant will be sent to the DAFPay Network 501(c)(3) non-profit organization (EIN: 93-1372175). The DAFPay Network will then review and process the grant and send the funds to the intended recipient.
+            - direct: Grant will be sent directly to the intended recipient.
+          enum:
+            - dafpay_network
+            - direct
+          example: direct
+        address:
+          $ref: "#/components/schemas/GrantAddress"
+    RecurringGrant:
+      type: object
+      description: |-
+        A RecurringGrant represents a successfully initiated recurring grant request with a Donor Advised Fund.
+        RecurringGrants are created when a person interacts with an instance of Chariot Connect and successfully submits a recurring grant and completes the workflow.
+        On creation, each RecurringGrant object will also have a Grant object created to represent the first grant of the recurring grant.
+        There can be many grants associated with the same recurring grant.
+      required:
+        - id
+        - workflowSessionId
+        - fundId
+        - amount
+        - frequency
+      properties:
+        id:
+          type: string
+          readOnly: true
+          description: The unique identifier for the object
+          format: uuid
+          example: cfe09e64-6a74-4dab-a565-361185a6f248
+        trackingId:
+          type: string
+          readOnly: true
+          description: The tracking ID for the grant
+          example: L9E182VBGP
+        workflowSessionId:
+          type: string
+          readOnly: true
+          description: ID of the Connect Workflow Session associated with this grant
+          format: uuid
+          example: 2d4b2a43-a5b4-4be1-ad1f-f932016ca4a6
+        fundId:
+          type: string
+          readOnly: true
+          description: ID of the donor advised fund
+          example: daf-id
+        frequency:
+          type: string
+          description: |-
+            How often the DAF provider will submit the recurring grant. At the moment, monthly is the only supported frequency.
+          enum:
+            - MONTHLY
+          example: MONTHLY
+        externalGrantId:
+          type: string
+          description: ID of the grant associated with the donor advised fund
+          example: 897823sdjf8sfjs
+        createdAt:
+          type: string
+          readOnly: true
+          format: date-time
+          description: Time when this object was created; expressed in ISO 8601 format
+          example: "2020-07-10 15:00:00.000"
+        updatedAt:
+          type: string
+          readOnly: true
+          format: date-time
+          description: Time when this object was last updated; expressed in ISO 8601 format
+          example: "2021-07-11 15:34:00.000"
+        amount:
+          type: number
+          format: integer
+          description: The grant amount expressed in units of whole cents
+          example: 15000
+        firstName:
+          type: string
+          description: The donor's first name
+          example: "Warren"
+        lastName:
+          type: string
+          description: The donor's last name
+          example: "Buffet"
+        phone:
+          type: string
+          description: The donor's phone number
+          example: "1237861020"
+        email:
+          type: string
+          description: The donor's email
+          example: "warrenBuffet@example.com"
+        note:
+          type: string
+          description: An note inputted by the user at submisson
+          example: "Please dedicate in memory of grandma"
+        address:
+          $ref: "#/components/schemas/GrantAddress"
+    ContributionFeeDetail:
+      type: object
+      required:
+        - name
+        - amount
+      properties:
+        name:
+          type: string
+          description: |
+            The name of the party charging the fee. This is an informational field.
+            If you need to differentiate between fees charged by different parties, you should use the `feeType` field.
+          example: "Chariot"
+        amount:
+          type: number
+          format: integer
+          description: The fee contribution amount expressed in units of cents
+          example: 1500
+        feeType:
+          type: string
+          description: |
+            This indicates the source of a fee contribution.
+              * chariot: Chariot's processing fee
+              * daf: The DAF's processing fee
+              * fundraising_application: The fundraising application's processing fee
+          example: "chariot"
+          enum:
+            - chariot
+            - daf
+            - fundraising_application
+    GrantStatus:
+      type: object
+      required:
+        - id
+        - createdAt
+        - status
+      properties:
+        id:
+          type: string
+          readOnly: true
+          description: The unique identifier for the object
+          format: uuid
+          example: cfe09e64-6a74-4dab-a565-361185a6f248
+        createdAt:
+          type: string
+          readOnly: true
+          format: date-time
+          description: Time when this object was created; expressed in ISO 8601 format
+          example: "2020-07-10 15:00:00.000"
+        status:
+          type: string
+          enum:
+            - Initiated
+            - Completed
+            - Canceled
+          description: |
+            The status of the grant. To see a description of each status, see the "Grant Statuses" section of the Chariot documentation.
+          example: Initiated
+        comment:
+          type: string
+          description: The user comment for the update
+          example: The grant has been received by the nonprofit
+    UnintegratedGrant:
+      type: object
+      description: |-
+        An Unintegrated Grant represents a grant requested through a provider that Chariot does not support.
+        Unintegrated grants should be treated as donation intents as Chariot can not guarantee that the grant was submitted or will be fulfilled.
+        Nonprofits should use the information provided in the unintegrated grant to follow up with the donor and/or the provider to check the status of the grant.
+        These are sometimes refered to as "Manual Grants".
+      required:
+        - id
+        - workflowSessionId
+        - fundId
+        - amount
+      properties:
+        id:
+          type: string
+          readOnly: true
+          description: The unique identifier for the object
+          format: uuid
+          example: cfe09e64-6a74-4dab-a565-361185a6f248
+        userFriendlyId:
+          type: string
+          readOnly: true
+          description: Often refered to as the "Chariot ID", this is the ID that will be included in the payment from the DAF provider.
+          example: "1234455"
+          deprecated: true
+        trackingId:
+          type: string
+          readOnly: true
+          description: The tracking ID for the unintegrated grant
+          example: L9E182VBGP
+        workflowSessionId:
+          type: string
+          readOnly: true
+          description: ID of the Connect Workflow Session associated with this grant
+          format: uuid
+          example: 2d4b2a43-a5b4-4be1-ad1f-f932016ca4a6
+        fundId:
+          type: string
+          readOnly: true
+          description: ID of the donor advised fund
+          example: daf-id
+        createdAt:
+          type: string
+          readOnly: true
+          format: date-time
+          description: Time when this object was created; expressed in ISO 8601 format
+          example: "2020-07-10 15:00:00.000"
+        updatedAt:
+          type: string
+          readOnly: true
+          format: date-time
+          description: Time when this object was last updated; expressed in ISO 8601 format
+          example: "2021-07-11 15:34:00.000"
+        amount:
+          type: number
+          format: integer
+          description: The grant amount expressed in units of whole cents
+          example: 15000
+        status:
+          type: string
+          description: |-
+            The status of the unintegrated grant.
+            To see a description of each status, see the "Unintegrated Grant Statuses" section of the Chariot documentation.
+          enum:
+            - Unknown
+            - Initiated
+            - Completed
+            - Canceled
+          example: Initiated
+        metadata:
+          type: object
+          description: A map of arbitrary string keys and values to store information about the object
+          additionalProperties:
+            type: string
+        firstName:
+          type: string
+          description: The donor's first name
+          example: "Warren"
+        lastName:
+          type: string
+          description: The donor's last name
+          example: "Buffet"
+        phone:
+          type: string
+          description: The donor's phone number
+          example: "1237861020"
+        email:
+          type: string
+          description: The donor's email
+          example: "warrenBuffet@example.com"
+        address:
+          $ref: "#/components/schemas/GrantAddress"
+        note:
+          type: string
+          description: An note inputted by the user at submisson
+          example: "Please dedicate in memory of grandma"
+        paymentChannel:
+          type: string
+          readOnly: true
+          description: |-
+            The payment channel for the unintegrated grant. This is useful to know how the grant will be sent.
+            The payment channel for unintegrated grants will always be:
+            - offline: Grant was initiated outside of Chariot so we're unable to confirm how the grant will be sent.
+          enum:
+            - offline
+          example: offline
+    Address:
+      type: object
+      required:
+        - city
+        - country
+        - line1
+        - postalCode
+        - state
+      properties:
+        city:
+          type: string
+          description: City, district, suburb, town, or village.
+        country:
+          type: string
+          description: Two-letter country code (https://en.wikipedia.org/wiki/ISO_3166-1_alpha-2)
+        line1:
+          type: string
+          description: Address line 1 (e.g. street, PO Box, or company name)
+        line2:
+          type: string
+          description: Address line 2 (e.g. apartment, suite, unit, or building)
+        postalCode:
+          type: string
+          description: ZIP or postal code
+        state:
+          type: string
+          description: State, county, province, or region
+    GrantAddress:
+      type: object
+      properties:
+        line1:
+          type: string
+          description: Address line 1 (e.g. street, PO Box, or company name)
+        line2:
+          type: string
+          description: Address line 2 (e.g. apartment, suite, unit, or building)
+        city:
+          type: string
+          description: City, district, suburb, town, or village.
+        state:
+          type: string
+          description: State, county, province, or region
+        postalCode:
+          type: string
+          description: ZIP or postal code
+    EventCategory:
+      type: string
+      description: |
+        The category of the event. This is useful for filtering events.
+      enum:
+        - "grant.created"
+        - "grant.updated"
+        - "unintegrated_grant.created"
+        - "unintegrated_grant.updated"
+    Event:
+      type: object
+      description: |
+        Events are records of things that happened to objects at Chariot.
+      properties:
+        id:
+          type: string
+          description: The unique identifier for the event
+          example: "203c4e56-5c39-4a66-abcd-2ec8af99a1b9"
+          readOnly: true
+        category:
+          $ref: "#/components/schemas/EventCategory"
+        created_at:
+          type: string
+          format: date-time
+          description: The date and time the event was created
+          example: "2024-01-19T18:48:56.37Z"
+          readOnly: true
+        associated_object_id:
+          type: string
+          description: The unique identifier for the associated object
+          example: "4d06d393-1f14-46cf-b02d-8db17d7ed06a"
+          readOnly: true
+        associated_object_type:
+          type: string
+          description: The type of the associated object
+          example: "grant"
+          readOnly: true
+    EventSubscriptionStatus:
+      type: string
+      description: |-
+        The status of the event subscription.
+        This indicates if we'll send notifications to this subscription
+          * active: subscription is active and events will be delivered normally
+          * disabled: subscription is temporarily disabled and events will not be delivered
+          * deleted: subscription has been deleted and events will not be delivered
+          * requires_attention: subscription has been disabled due to delivery failures and events will not be delivered
+      enum:
+        - "active"
+        - "disabled"
+        - "deleted"
+        - "requires_attention"
+    EventSubscription:
+      type: object
+      description: |
+        Webhooks are event notifications we send to you by HTTPS POST requests.
+        Event Subscriptions are how you configure your application to listen for them.
+      required:
+        - url
+      properties:
+        id:
+          type: string
+          description: The unique identifier for the event subscription
+          example: "4d06d393-1f14-46cf-b02d-8db17d7ed06a"
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+          description: The date and time the event subscription was created
+          example: "2024-01-14T12:48:56.37Z"
+          readOnly: true
+        status:
+          $ref: "#/components/schemas/EventSubscriptionStatus"
+        url:
+          type: string
+          description: The webhook url where we'll send notifications.
+          example: "https://example.com/webhook"
+        category:
+          $ref: "#/components/schemas/EventCategory"
+    File:
+      type: object
+      description: |
+        Files are objects that represent a file hosted on Chariot's servers.
+        Files are uploaded by you (for example, when uploading a grant letter).
+      required:
+        - id
+        - purpose
+        - mime_type
+        - created_at
+      x-fern-audiences:
+        - payments
+      properties:
+        id:
+          type: string
+          description: The unique identifier for the file
+          example: "file_1LaXpKGUcADgqoEMl0Cx0Ygg"
+          readOnly: true
+        purpose:
+          type: string
+          description: |
+            What the File will be used for. We may add additional possible values for this enum over time; 
+            your application should be able to handle such additions gracefully.
+            grant_letter: A grant letter
+            tax_document: A tax document
+            other: A file purpose not covered by any of the other cases.
+          example: "grant_letter"
+          enum:
+            - grant_letter
+            - tax_document
+            - other
+        file_name:
+          type: string
+          description: The name of the file
+          example: "grant_letter.pdf"
+        mime_type:
+          type: string
+          description: The MIME type of the file
+          example: "application/pdf"
+        download_url:
+          type: string
+          description: |
+            A URL from where the File can be downloaded at this point in time.
+            The location of this URL may change over time.
+          example: "https://sandboxapi.givechariot.com/files/file_1LaXpKGUcADgqoEMl0Cx0Ygg"
+          readOnly: true
+        description:
+          type: string
+          description: A description of the file
+          example: "Grant letter for the grant to the nonprofit"
+        created_at:
+          type: string
+          format: date-time
+          description: The date and time the file was created
+          example: "2020-07-10 15:00:00.000"
+          readOnly: true
+    FileList:
+      description: A list of files
+      x-fern-audiences:
+        - payments
+      properties:
+        results:
+          type: array
+          description: The list of files
+          items:
+            $ref: "#/components/schemas/File"
+        paging:
+          type: object
+          description: The paging information
+          properties:
+            nextPageToken:
+              type: string
+              description: The token to use for pagination. If not set, the first page of results will be returned.
+              example: "eyJpZCI6IjEyMzQ1Njc4OTAiLCJ0aW1lc3RhbXAiOiIyMDIwLTA3LTEwIDE1OjAwOjAwLjAwMCJ9"
+            total:
+              type: integer
+    Transaction:
+      type: object
+      description: |
+        A transaction represents an individual line-item or donation for the receiving organization.
+        There can be many transactions associated with a single payment.
+      required:
+        - account_id
+        - amount
+        - description
+        - payment
+      x-fern-audiences:
+        - payments
+      properties:
+        id:
+          type: string
+          description: The unique identifier for the transaction
+          example: "tx_1LaXpKGUcADgqoEMl0Cx0Ygg"
+          readOnly: true
+        account_id:
+          type: string
+          description: The identifier for the nonprofit's account that will receive the transaction.
+          example: "acc_1LaXpKGUcADgqoEMl0Cx0Ygg"
+        amount:
+          type: integer
+          format: int64
+          description: The transaction amount in minor currency units (cents)
+          example: 10000
+        currency:
+          type: string
+          description: The currency code for the transaction
+          example: "USD"
+          default: "USD"
+        description:
+          type: string
+          description: |
+            A description of the transaction.
+            Remittance information for the payment that will show on the recipient's bank statement.
+          example: "Payment to Nonprofit"
+        source:
+          $ref: "#/components/schemas/TransactionSource"
+        donors:
+          type: array
+          description: The list of donors for the transaction
+          items:
+            $ref: "#/components/schemas/Donor"
+        payment:
+          $ref: "#/components/schemas/PaymentDetails"
+        attachment_file_id:
+          type: string
+          description: |-
+            The unique identifier for the file that is attached to the transaction.
+            This is useful if you want to attach a letter or another document to the transaction.
+          example: "file_1LaXpKGUcADgqoEMl0Cx0Ygg"
+        status:
+          type: string
+          description: The status of the transaction
+          example: "pending"
+          readOnly: true
+          enum:
+            - canceled
+            - pending
+            - submitted
+            - complete
+            - rejected
+        created_at:
+          type: string
+          format: date-time
+          description: The date and time the payment was created
+          example: "2020-07-10 15:00:00.000"
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          description: The date and time the payment was last updated
+          example: "2020-07-10 15:00:00.000"
+          readOnly: true
+        metadata:
+          type: object
+          description: Additional metadata for the transaction
+          additionalProperties: 
+            type: string
+    TransactionList:
+      description: A list of transactions
+      x-fern-audiences:
+        - payments
+      properties:
+        results:
+          type: array
+          description: The list of transactions
+          items:
+            $ref: "#/components/schemas/Transaction"
+        paging:
+          type: object
+          description: The paging information
+          properties:
+            nextPageToken:
+              type: string
+              description: The token to use for pagination. If not set, the first page of results will be returned.
+              example: "eyJpZCI6IjEyMzQ1Njc4OTAiLCJ0aW1lc3RhbXAiOiIyMDIwLTA3LTEwIDE1OjAwOjAwLjAwMCJ9"
+            total:
+              type: integer
+    PaymentDetails:
+      type: object
+      description: The payment details for the transaction
+      required:
+        - method
+        - reference
+        - sent_at
+      x-fern-audiences:
+        - payments
+      properties:
+        method:
+          type: string
+          description: The payment method
+          example: "ach"
+          enum:
+            - ach
+            - check
+        reference:
+          $ref: "#/components/schemas/PaymentReference"
+        sent_at:
+          type: string
+          format: timestamp
+          description: The date and time when the payment was sent
+          example: "2020-07-10 15:00:00.000"
+    PaymentReference:
+      type: object
+      description: The payment reference for the transaction
+      x-fern-audiences:
+        - payments
+      properties:
+        ach:
+          $ref: "#/components/schemas/AchPaymentReference"
+        check:
+          $ref: "#/components/schemas/CheckPaymentReference"
+    AchPaymentReference:
+      type: object
+      description: The ACH payment reference for the transaction
+      x-fern-audiences:
+        - payments
+      properties:
+        group_id:
+          type: string
+          description: The group ID is a unique identifier for the group of transactions that are sent together.
+          example: "123456789"
+        originator_company_id:
+          type: string
+          description: An identifier for the originating company. This is generally, but not always, a stable identifier across multiple transfers.
+          example: "123456789"
+        originator_company_name:
+          type: string
+          description: The name of the originating company.
+          example: "Charitable Payer Inc."
+        trace_number:
+          type: string
+          description: |
+            A 15 digit number recorded in the Nacha file and available to both the originating and receiving bank.
+            Along with the amount, date, and originating routing number, this can be used to identify the ACH transfer at either bank.
+            ACH trace numbers are not unique, but are used to correlate returns.
+          example: "386503938889057"
+    CheckPaymentReference:
+      type: object
+      description: The check payment reference for the transaction
+      x-fern-audiences:
+        - payments
+      properties:
+        carrier:
+          type: string
+          description: The carrier for the check
+          example: "USPS"
+        memo:
+          type: string
+          description: The memo for the check
+          example: "Payment to Nonprofit"
+        check_number:
+          type: string
+          description: The check number
+          example: "123456789"
+    TransactionSource:
+      type: object
+      description: |
+        This is an object that allows you to specify the source of the transaction.
+        Note that for backwards compatibility reasons, additional undocumented keys may appear in this object.
+        These should be treated as deprecated and will be removed in the future.
+      x-fern-audiences:
+        - payments
+      properties:
+        donor_advised_fund_grant:
+          $ref: "#/components/schemas/DonorAdvisedFundGrant"
+        corporate_match:
+          $ref: "#/components/schemas/CorporateMatch"
+    DonorAdvisedFundGrant:
+      type: object
+      description: A donor-advised fund grant is a charitable donation made by a donor-advised fund (DAF) on behalf of the donor.
+      x-fern-audiences:
+        - payments
+      properties:
+        organization_name:
+          type: string
+          description: The name of the DAF organization that made the grant
+          example: "Vanguard Charitable"
+        fund_name:
+          type: string
+          description: The name of the DAF fund that made the grant
+          example: "John Doe Fund"
+        purpose:
+          type: string
+          description: The purpose of the grant
+          example: "General Operating Support"
+        note:
+          type: string
+          description: A note about the grant
+          example: "This grant is for the general operating support of the organization."
+    CorporateMatch:
+      type: object
+      description: A corporate match is a charitable donation made by a corporation on behalf of an employee.
+      x-fern-audiences:
+        - payments
+      properties:
+        program_name:
+          type: string
+          description: The name of the corporate match program
+          example: "Matching Gifts Program"
+        company_name:
+          type: string
+          description: The name of the company that made the match
+          example: "Chariot Giving, Inc."
+        employee_name:
+          type: string
+          description: The name of the employee that requested the match
+          example: "John Doe"
+    Donor:
+      type: object
+      description: The donor information for the transaction
+      x-fern-audiences:
+        - payments
+      properties:
+        name:
+          type: string
+          description: The name of the donor
+          example: "John Doe"
+        email:
+          type: string
+          description: The email address of the donor
+          example: "developers@givechariot.com"
+        phone:
+          type: string
+          description: The phone number of the donor
+          example: "415-555-1212"
+        address:
+          $ref: "#/components/schemas/Address"
+    AccountList:
+      description: A list of accounts
+      x-fern-audiences:
+        - payments
+      properties:
+        results:
+          type: array
+          description: The list of accounts
+          items:
+            $ref: "#/components/schemas/Account"
+        paging:
+          type: object
+          description: The paging information
+          properties:
+            nextPageToken:
+              type: string
+              description: The token to use for pagination. If not set, the first page of results will be returned.
+              example: "eyJpZCI6IjEyMzQ1Njc4OTAiLCJ0aW1lc3RhbXAiOiIyMDIwLTA3LTEwIDE1OjAwOjAwLjAwMCJ9"
+            total:
+              type: integer
+    Account:
+      type: object
+      description: An account represents a verified location to send both payments and corresponding data to a nonprofit.
+      required:
+        - id
+        - email_address
+        - us_bank_account_address
+      x-fern-audiences:
+        - payments
+      properties:
+        id:
+          type: string
+          description: The unique identifier for the account
+          example: "acc_1LaXpKGUcADgqoEMl0Cx0Ygg"
+          readOnly: true
+        name:
+          type: string
+          description: The name of the account
+          example: "Chariot Giving Network"
+        mailing_address:
+          $ref: "#/components/schemas/Address"
+        email_address:
+          type: string
+          description: The email address
+          example: "developers@givechariot.com"
+        us_bank_account_address:
+          $ref: "#/components/schemas/UsBankAccountAddress"
+    UsBankAccountAddress:
+      type: object
+      description: The payment information for a US bank account
+      x-fern-audiences:
+        - payments
+      properties:
+        ach:
+          $ref: "#/components/schemas/UsBankAccountAchAddress"
+    UsBankAccountAchAddress:
+      type: object
+      description: The ACH payment information for a US bank account
+      x-fern-audiences:
+        - payments
+      required:
+        - account_number
+        - routing_number
+      properties:
+        account_number:
+          type: string
+          description: The account number
+          example: "884727222"
+        routing_number:
+          type: string
+          description: The American Bankers' Association (ABA) Routing Transit Number (RTN).
+          example: "123456789"
+    Payment:
+      type: object
+      description: A payment moves funds to a verified nonprofit Chariot account.
+      required:
+        - account_id
+        - amount
+        - description
+      properties:
+        id:
+          type: string
+          description: The unique identifier for the payment
+          example: "1234567890"
+          readOnly: true
+        account_id:
+          type: string
+          description: The identifier for the account that will receive the payment.
+          example: "acc_1LaXpKGUcADgqoEMl0Cx0Ygg"
+        amount:
+          type: integer
+          format: int64
+          description: The payment amount in USD cents. Must be a positive amount.
+          example: 10000
+        description:
+          type: string
+          description: |
+            A description of the payment.
+            Remittance information for the payment that will show on the recipient's bank statement.
+          example: "Payment to Nonprofit"
+        chariot_id:
+          type: string
+          description: |
+            The unique identifier for the initiated payment from Chariot.
+            This is useful if the payment was initiated by Chariot and allows for end-to-end tracking of the payment for the donor.
+          example: "1200321"
+        status:
+          type: string
+          description: The status of the payment
+          example: "pending"
+          enum:
+            - canceled
+            - pending
+            - submitted
+            - complete
+            - rejected
+        created_at:
+          type: string
+          format: date-time
+          description: The date and time the payment was created
+          example: "2020-07-10 15:00:00.000"
+          readOnly: true
+    PaymentList:
+      description: A list of payments
+      properties:
+        results:
+          type: array
+          description: The list of payments
+          items:
+            $ref: "#/components/schemas/Payment"
+        paging:
+          type: object
+          description: The paging information
+          properties:
+            nextPageToken:
+              type: string
+              description: The token to use for pagination. If not set, the first page of results will be returned.
+              example: "eyJpZCI6IjEyMzQ1Njc4OTAiLCJ0aW1lc3RhbXAiOiIyMDIwLTA3LTEwIDE1OjAwOjAwLjAwMCJ9"
+            total:
+              type: integer
+    Error:
+      type: object
+      required:
+        - timestamp
+        - code
+        - error
+        - message
+      properties:
+        timestamp:
+          type: string
+          description: time when the error was reported. Expressed in ISO 8601 format.
+          example: "2020-07-10 15:00:00.000"
+        code:
+          type: number
+          description: HTTP status code of the error
+          example: 400
+        error:
+          type: string
+          description: A short name of the error; usually the HTTP status.
+          example: Bad Request
+        message:
+          type: string
+          description: The description of the error
+          example: Expected an API key to be provided in the header `x-chariot-api-key`
+  headers:
+    X-Request-Id:
+      description: The unique identifier for the request
+      schema:
+        type: string
+    Idempotency-Key:
+      description: |
+        The unique identifier for the request.
+        This header is used to ensure idempotency for requests that may be retried.
+      schema:
+        type: string
+    Location:
+      description: The URI of the created object
+      schema:
+        type: string
+  requestBodies:
+    GrantCaptureRequest:
+      description: |-
+        The request to create and submit a grant. This is useful to capture a grant intent associated with DAFpay workflow session.
+        The request should specify the grant amount. This is the amount submitted for processing by the DAF.
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+              - workflowSessionId
+              - amount
+            properties:
+              workflowSessionId:
+                type: string
+                description: |-
+                  The identifier of the donor's DAFpay Workflow Session.
+                  See [Integrating Connect](/integrating-connect) for how to get this value from the DAFpay client-side SDK.
+              amount:
+                type: number
+                description: |-
+                  The grant amount in cents that will be processed by Chariot and submitted to the DAF.
+                  This amount must be in whole dollar increments (rounded to the nearest hundred) as currently
+                  all DAFs only accept whole dollar grant amounts.
+              applicationFeeAmount:
+                type: number
+                description: |-
+                  This parameter specifies the fee your platform plans to take from the grant in cents.
+                  This is a fee in addition to Chariot's processing fee. With application fees,
+                  Chariot collects the fee you determine from the nonprofit and passes it to your platform.
+                  Please note that platform fees are only taken when the grant is successfully received by the Nonprofit.
+                  The sum of Chariot's fee and the applicationFeeAmount cannot exceed 5% of the grant's amount.
+                  If the fee limit is exceeded, a `400 Bad Request` error will be returned.
+              donor:
+                type: object
+                properties:
+                  firstName:
+                    type: string
+                    description: The first name of the donor
+                  lastName:
+                    type: string
+                    description: The last name of the donor
+                  email:
+                    type: string
+                    description: The email address of the donor
+                  phone:
+                    type: string
+                    description: The phone number of the donor
+                  address:
+                    $ref: "#/components/schemas/GrantAddress"
+              designation:
+                type: string
+                description: |-
+                  The designation to include on the grant. If this is left blank, "Where needed most" will be used.
+                  Note that including a custom designation may cause the grant approval process to take longer.
+                  Designations over 100 characters will be truncated.
+    UpdateGrantRequest:
+      description: |-
+        The request to update a grant. This is useful to update the status of a grant.
+        The request should specify the grant status.
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              status:
+                type: string
+                description: |-
+                  The status of the grant:
+                    * Initiated: The grant has been initiated and is ready to be processed
+                    * Completed: The grant has been completed
+                enum:
+                  - "Initiated"
+                  - "Completed"
+                example: "Completed"
+              acknowledgedAt:
+                type: string
+                format: date-time
+                description: |-
+                  The date and time the grant was acknowledged by the nonprofit.
+                  This is useful for nonprofits to indicate when they have received and processed the grant.
+                  Expressed in ISO 8601 format.
+                example: "2020-07-10 15:00:00.000"
+    RecurringGrantCaptureRequest:
+      description: |-
+        The request to create and submit a monthly recurring grant. This is useful to capture a recurring grant intent associated with Connect workflow session.
+        The request should specify the grant amount. The grant will re-occur according to the scheduled frequency or recurrence of the request.
+        The recurring grant will continue indefinitely until the donor runs out of funds or until the donor cancels the recurring grant with their DAF provider.
+        Some DAF providers require an end-date or number of payments in order to create a recurring grant.
+        In most cases, the recurring grant will continue indefinitely until the donor's account runs out of funds or until the donor cancels the recurring grant with their DAF provider.
+        Some DAF providers require an explicit bound to the time period or the number of payments in which case currently we opt for the longest recurring donation timeline possible.
+        For example, if the DAF provider allows recurring donations to continue for up to 10 years we will submit the request as such.
+        This is the amount submitted for processing by the DAF.
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+              - workflowSessionId
+              - amount
+              - frequency
+            properties:
+              workflowSessionId:
+                type: string
+                description: |-
+                  The identifier of the donor's DAFpay Workflow Session.
+                  See [Integrating Connect](/integrating-connect) for how to get this value from the DAFpay client-side SDK.
+              frequency:
+                type: string
+                description: |-
+                  The recurrence interval schedule for the recurring grant. Currently, only `MONTHLY` is supported.
+                enum:
+                  - MONTHLY
+                example: MONTHLY
+              amount:
+                type: number
+                description: |-
+                  The final grant amount in cents that will be processed by Chariot and submitted to the DAF for recurring gifts.
+                  This amount must be in whole dollar increments (rounded to the nearest hundred) as currently
+                  all DAFs only accept whole dollar grants.
+              applicationFeeAmount:
+                type: number
+                description: |-
+                  This parameter specifies the fee your platform plans to take from the first grant in cents.
+                  This is a fee in addition to Chariot's processing fee. With application fees,
+                  Chariot collects the fee you determine from the nonprofit and passes it to your platform.
+                  Please note that platform fees are only taken when the grant is successfully received by the Nonprofit.
+                  The sum of Chariot's fee and the applicationFeeAmount cannot exceed 5% of the grant's amount.
+                  If the 5% limit is exceeded, a 400 error will be returned.
+              donor:
+                type: object
+                properties:
+                  firstName:
+                    type: string
+                    description: The first name of the donor
+                  lastName:
+                    type: string
+                    description: The last name of the donor
+                  email:
+                    type: string
+                    description: The email address of the donor
+                  phone:
+                    type: string
+                    description: The phone number of the donor
+                  address:
+                    $ref: "#/components/schemas/GrantAddress"
+              designation:
+                type: string
+                description: |-
+                  The designation to include on the grant. If this is left blank, "Where needed most" will be used.
+                  Note that including a custom designation may cause the grant approval process to take longer.
+                  Designations over 100 characters will be truncated.
+    CreateConnectRequest:
+      description: |-
+        The request to create a new Connect object for a Nonprofit.
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              name:
+                type: string
+                description: |-
+                  A human readable name of the Connect, optional.
+              metadata:
+                type: object
+                description: A map of arbitrary string keys and values to store information about the object.
+                additionalProperties:
+                  type: string
+    CreateNonprofitRequest:
+      description: |-
+        The request to create and register a nonprofit organization account.
+        The ein and user.email properties are required.
+        The user.email should be a valid contact email address for the nonprofit organization.
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+              - ein
+              - user
+            properties:
+              user:
+                type: object
+                required:
+                  - email
+                properties:
+                  email:
+                    type: string
+                    description: The email address for the nonprofit account contact
+                    example: ben.give@co.com
+                  phone:
+                    type: string
+                    description: The phone number for the nonprofit account contact
+                    example: "9127772424"
+                  firstName:
+                    type: string
+                    description: The first name of the nonprofit account contact
+                    example: Ben
+                  lastName:
+                    type: string
+                    description: The last name of the nonprofit account contact
+                    example: Give
+              ein:
+                type: string
+                description: The US federal employer identification number (Tax ID); unique on the system
+                example: "043567500"
+              preferredName:
+                type: string
+                description: |-
+                  The preferred name of the nonprofit organization. This is the name that shows up on the nonprofit's dashboard and Connect modal. This is useful for nonprofits that are known by a different name to donors and don't use their IRS registered name publicly.
+              picture:
+                type: string
+                description: The URI of the nonprofit's logo
+              website:
+                type: string
+                description: The URL of the nonprofit's website
+    CreateEventSubscriptionRequest:
+      description: The request body for creating an event subscription
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+              - url
+              - category
+            properties:
+              url:
+                type: string
+                description: The webhook url where we'll send notifications.
+                example: "https://example.com/webhook"
+              category:
+                $ref: "#/components/schemas/EventCategory"
+              signingSecret:
+                type: string
+                description: |-
+                  The key that will be used to sign webhooks.
+                  If no value is passed, a random string will be used as default.
+                  This is necessary to verify that the webhook is coming from Chariot.
+                  While this parameter is optional, it is highly recommended to pass a value
+                  for the secret and implement webhook signature verification.
+    UpdateEventSubscriptionRequest:
+      description: The request body for creating an event subscription
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              status:
+                type: string
+                description: |-
+                  The status of the event subscription:
+                    * active: The event subscription is active and events will be delivered
+                    * disabled: The event subscription is temporarily disabled and events will not be delivered
+                    * deleted: The event subscription is permanently deleted and events will not be delivered
+                enum:
+                  - "active"
+                  - "disabled"
+                  - "deleted"
+  responses:
+    ListDafsResponse:
+      description: The response for Dafs.list
+      headers:
+        X-Request-Id:
+          $ref: "#/components/headers/X-Request-Id"
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              results:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Daf"
+              nextPageToken:
+                type: string
+                description: |-
+                  A cursor token to use to retrieve the next page of results by making another API call to the same endpoint with the same parameters (only substituting the pageToken with this value). If specified, then more results exist on the server that were not returned, otherwise no more results exist on the server.
+          examples:
+            MoreResults:
+              value:
+                results:
+                  - id: "0bf40881-8ee2-47fb-98ca-f58c7999aa34"
+                    orgName: "National Philanthropic Trust"
+                    address: "123 Main St."
+                    address2: "Apt 100"
+                    city: "New York"
+                    state: "NY"
+                    zip: "12345"
+                    supported: true
+                    minimumGrantAmount: 5000
+                    institutionDown: false
+                nextPageToken: "c3f685f2-2dda-4956-815b-39867a5e5638"
+            NoMoreResults:
+              value:
+                results:
+                  - id: "0bf40881-8ee2-47fb-98ca-f58c7999aa34"
+                    orgName: "National Philanthropic Trust"
+                    address: "123 Main St."
+                    address2: "Apt 100"
+                    city: "New York"
+                    state: "NY"
+                    zip: "12345"
+                    supported: true
+                    minimumGrantAmount: 5000
+                    institutionDown: false
+    ListGrantsResponse:
+      description: The response for Grants.list
+      headers:
+        X-Request-Id:
+          $ref: "#/components/headers/X-Request-Id"
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              results:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Grant"
+              nextPageToken:
+                type: string
+                nullable: true
+                description: |-
+                  A cursor token to use to retrieve the next page of results by making another API call to the same endpoint with the same parameters (only changing the pageToken). If specified, then more results exist on the server that were not returned, otherwise no more results exist on the server.
+          examples:
+            MoreResults:
+              value:
+                results:
+                  - id: "1e60800e-849b-43d1-870e-57afc8d75473"
+                    workflowSessionId: "cfe09e64-6a74-4dab-a565-361185a6f248"
+                    fundId: "daf-id"
+                    createdAt: "2021-08-10 15:00:00.000"
+                    updatedAt: "2021-08-11 15:34:00.000"
+                    amount: 15000
+                    status: "Initiated"
+                nextPageToken: "c3f685f2-2dda-4956-815b-39867a5e5638"
+            NoMoreResults:
+              value:
+                results:
+                  - id: "1e60800e-849b-43d1-870e-57afc8d75473"
+                    workflowSessionId: "cfe09e64-6a74-4dab-a565-361185a6f248"
+                    fundId: "daf-id"
+                    createdAt: "2021-08-10 15:00:00.000"
+                    updatedAt: "2021-08-11 15:34:00.000"
+                    amount: 20000
+                    status: "Received"
+                nextPageToken: null
+    ListRecurringGrantsResponse:
+      description: The response for RecurringGrants.list
+      headers:
+        X-Request-Id:
+          $ref: "#/components/headers/X-Request-Id"
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              results:
+                type: array
+                items:
+                  $ref: "#/components/schemas/RecurringGrant"
+              nextPageToken:
+                type: string
+                description: |-
+                  A cursor token to use to retrieve the next page of results by making another API call to the same endpoint with the same parameters (only changing the pageToken). If specified, then more results exist on the server that were not returned, otherwise no more results exist on the server.
+          examples:
+            MoreResults:
+              value:
+                results:
+                  - id: "29650c10-1eb3-4f97-a63e-f2e41c145b53"
+                    workflowSessionId: "b76fa69f-c554-43b2-af9a-1d4bb9a02016"
+                    fundId: "daf-id"
+                    createdAt: "2021-08-10 15:00:00.000"
+                    updatedAt: "2021-08-11 15:34:00.000"
+                    amount: 15000
+                    frequency: MONTHLY
+                nextPageToken: "c3f685f2-2dda-4956-815b-39867a5e5638"
+            NoMoreResults:
+              value:
+                results:
+                  - id: "579e2864-d65a-4a21-a056-1c91d0a95b5c"
+                    workflowSessionId: "ee27b65b-22f5-42fa-b966-0f83cac8fd2c"
+                    fundId: "daf-id"
+                    createdAt: "2021-08-10 16:00:00.000"
+                    updatedAt: "2021-08-11 15:25:00.000"
+                    amount: 20000
+                    frequency: MONTHLY
+    ListUnintegratedGrantsResponse:
+      description: The response for UnintegratedGrants.list
+      headers:
+        X-Request-Id:
+          $ref: "#/components/headers/X-Request-Id"
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              results:
+                type: array
+                items:
+                  $ref: "#/components/schemas/UnintegratedGrant"
+              nextPageToken:
+                type: string
+                description: |-
+                  A cursor token to use to retrieve the next page of results by making another API call
+                   to the same endpoint with the same parameters (only changing the pageToken). If
+                   specified, then more results exist on the server that were not returned, otherwise
+                   no more results exist on the server.
+          examples:
+            MoreResults:
+              value:
+                results:
+                  - id: "1e60800e-849b-43d1-870e-57afc8d75473"
+                    workflowSessionId: "cfe09e64-6a74-4dab-a565-361185a6f248"
+                    fundId: "daf-id"
+                    createdAt: "2021-08-10 15:00:00.000"
+                    updatedAt: "2021-08-11 15:34:00.000"
+                    amount: 15000
+                nextPageToken: "c3f685f2-2dda-4956-815b-39867a5e5638"
+            NoMoreResults:
+              value:
+                results:
+                  - id: "1e60800e-849b-43d1-870e-57afc8d75473"
+                    workflowSessionId: "cfe09e64-6a74-4dab-a565-361185a6f248"
+                    fundId: "daf-id"
+                    createdAt: "2021-08-10 15:00:00.000"
+                    updatedAt: "2021-08-11 15:34:00.000"
+                    amount: 20000
+    ListEventsResponse:
+      description: The response for Events.list
+      headers:
+        X-Request-Id:
+          $ref: "#/components/headers/X-Request-Id"
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              results:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Event"
+              nextPageToken:
+                type: string
+                description: |-
+                  A cursor token to use to retrieve the next page of results by making another API call
+                   to the same endpoint with the same parameters (only changing the pageToken). If
+                   specified, then more results exist on the server that were not returned, otherwise
+                   no more results exist on the server.
+    ListEventSubscriptionsResponse:
+      description: The response for Events.list
+      headers:
+        X-Request-Id:
+          $ref: "#/components/headers/X-Request-Id"
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              results:
+                type: array
+                items:
+                  $ref: "#/components/schemas/EventSubscription"
+              nextPageToken:
+                type: string
+                description: |-
+                  A cursor token to use to retrieve the next page of results by making another API call
+                   to the same endpoint with the same parameters (only changing the pageToken). If
+                   specified, then more results exist on the server that were not returned, otherwise
+                   no more results exist on the server.
+    BadRequestError:
+      description: The request is invalid or contains invalid parameters
+      headers:
+        X-Request-Id:
+          $ref: "#/components/headers/X-Request-Id"
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+          example:
+            timestamp: "2020-07-10 15:00:00.000"
+            code: 400
+            error: "Bad Request"
+            message: "Expected an API key to be provided in the header `x-chariot-api-key`"
+    AuthenticationError:
+      description: Unauthorized. The request is missing the security (OAuth2 Bearer token) requirements and the server is unable to verify the identify of the caller.
+      headers:
+        X-Request-Id:
+          $ref: "#/components/headers/X-Request-Id"
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+          example:
+            timestamp: "2020-07-10 15:00:00.000"
+            code: 401
+            error: "Unauthorized"
+            message: "Unauthorized"
+    ForbiddenError:
+      description: Access denied
+      headers:
+        X-Request-Id:
+          $ref: "#/components/headers/X-Request-Id"
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+          example:
+            timestamp: "2020-07-10 15:00:00.000"
+            code: 403
+            error: "Forbidden"
+            message: "User is not allowed to access this resource"
+    NotFoundError:
+      description: Resource Not Found
+      headers:
+        X-Request-Id:
+          $ref: "#/components/headers/X-Request-Id"
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+          example:
+            timestamp: "2020-07-10 15:00:00.000"
+            code: 404
+            error: "Not Found"
+            message: "Resource is not found"
+    ConflictError:
+      description: Resource Conflicts
+      headers:
+        X-Request-Id:
+          $ref: "#/components/headers/X-Request-Id"
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+          example:
+            timestamp: "2020-07-10 15:00:00.000"
+            code: 409
+            error: "Conflict"
+            message: "Request conflicts with an already existing resource"
+    GoneError:
+      description: Resource Gone or Expired
+      headers:
+        X-Request-Id:
+          $ref: "#/components/headers/X-Request-Id"
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+          example:
+            timestamp: "2020-07-10 15:00:00.000"
+            code: 410
+            error: "Gone"
+            message: "The resource has expired"
+    PreconditionFailedError:
+      description: Precondition Failed
+      headers:
+        X-Request-Id:
+          $ref: "#/components/headers/X-Request-Id"
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+          example:
+            timestamp: "2020-07-10 15:00:00.000"
+            code: 412
+            error: "Precondition Failed"
+            message: "The requested action has a failed precondition"
+    InternalServerError:
+      description: Internal Server Error
+      headers:
+        X-Request-Id:
+          $ref: "#/components/headers/X-Request-Id"
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+          example:
+            timestamp: "2020-07-10 15:00:00.000"
+            code: 500
+            error: "Internal server error"
+            message: "The server encountered an error processing your request"
+  examples:
+    NonprofitRedCross:
+      summary: American Red Cross
+      value:
+        id: "021cf6aa-cb91-4b92-ae03-82a211cc8328"
+        name: "American Red Cross"
+        ein: "530196605"
+        createdAt: "2021-07-10 15:00:00.000"
+        updatedAt: "2021-07-11 15:34:00.000"
+        isDafPayNetwork: false
+        inGoodStanding: true
+    ConnectOutput:
+      summary: Simple connect output
+      value:
+        id: "test_de5a2e7d-c960-4eaa-8bd2-e8d2cc5b1a55"
+        name: "website"
+        apiKey: "test_98235982835"
+        active: true
+        createdAt: "2021-07-10 15:00:00.000"
+        updatedAt: "2021-07-11 15:34:00.000"
+        createdBy: "user123"
+        metadata:
+          tag1: "value1"
+    GrantOutput:
+      summary: Simple grant output
+      value:
+        id: "1e60800e-849b-43d1-870e-57afc8d75473"
+        workflowSessionId: "cfe09e64-6a74-4dab-a565-361185a6f248"
+        fundId: "daf-id"
+        createdAt: "2021-08-10 15:00:00.000"
+        updatedAt: "2021-08-11 15:34:00.000"
+        amount: 15000
+        status: "Initiated"
+    RecurringGrantOutput:
+      summary: Simple recurring grant output.
+      value:
+        id: "1e60800e-849b-43d1-870e-57afc8d75473"
+        workflowSessionId: "cfe09e64-6a74-4dab-a565-361185a6f248"
+        fundId: "daf-id"
+        createdAt: "2021-08-10 15:00:00.000"
+        updatedAt: "2021-08-11 15:34:00.000"
+        amount: 15000
+        frequency: MONTHLY
+    UnintegratedGrantOutput:
+      summary: Simple unintegrated grant output
+      value:
+        id: "1e60800e-849b-43d1-870e-57afc8d75473"
+        workflowSessionId: "cfe09e64-6a74-4dab-a565-361185a6f248"
+        fundId: "daf-id"
+        createdAt: "2021-08-10 15:00:00.000"
+        updatedAt: "2021-08-11 15:34:00.000"
+        amount: 15000
+    DafOutput:
+      summary: NPT DAF
+      value:
+        id: "0bf40881-8ee2-47fb-98ca-f58c7999aa34"
+        orgName: "National Philanthropic Trust"
+        address: "123 Main St."
+        address2: "Apt 100"
+        city: "New York City"
+        state: "New York"
+        zip: "12345"
+        supported: true
+        minimumGrantAmount: 25000
+        institutionDown: false

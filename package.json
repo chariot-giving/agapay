@@ -9,7 +9,7 @@
     ],
     "scripts": {
         "db:build": "prisma format && prisma generate",
-        "build": "npm run db:build",
+        "build": "turbo run db:build",
         "clean": "rm -rf .turbo && rm -rf node_modules && rm -rf dist",
         "docker:base": "docker compose --project-name agapay -f docker-compose.yaml --env-file .env",
         "docker:dev": "npm run docker:base up --renew-anon-volumes",
@@ -22,7 +22,9 @@
     "prisma": {
         "seed": "ts-node prisma/seed.ts"
     },
+    "packageManager": "yarn@1.22.19",
     "devDependencies": {
+        "turbo": "^2.1.1",
         "@types/node": "^20.3.3",
         "cross-env": "^7.0.3",
         "dotenv": "^16.1.4",
