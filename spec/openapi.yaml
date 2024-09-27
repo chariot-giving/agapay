@@ -1035,7 +1035,8 @@ components:
     Organization:
       type: object
       description: |-
-        An `Organization` represents an operating entity or an operating sub-organization of a parent or sponsoring entity.
+        An `Organization` represents an operating nonprofit or an operating sub-organization of a parent or sponsoring nonprofit.
+        The generally accepted identifier for an organization is its domain. This domain provides proof of identity, ownership and relationship to an entity.
         Organizations can receive payments from payers on the network.
       required:
         - id
@@ -1068,7 +1069,9 @@ components:
           example: independent_nonprofit
         parent_organization_id:
           type: string
-          description: The unique identifier of the parent organization, if this is a sponsored organization
+          description: |-
+            The unique identifier of the parent organization, if this is a sponsored organization.
+            This value is `null` or empty if the organization is not sponsored or not a child of a parent organization.
           example: org_01j8rs605a4gctmbm58d87mvsk
         domain:
           $ref: "#/components/schemas/Domain"
