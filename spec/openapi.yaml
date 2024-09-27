@@ -96,7 +96,6 @@ paths:
           $ref: "#/components/responses/ConflictError"
         "500":
           $ref: "#/components/responses/InternalServerError"
-
   /organizations:
     get:
       summary: List organizations
@@ -187,7 +186,6 @@ paths:
           $ref: "#/components/responses/NotFoundError"
         "500":
           $ref: "#/components/responses/InternalServerError"
-
   /addresses:
     get:
       summary: List Addresses
@@ -284,7 +282,6 @@ paths:
           $ref: "#/components/responses/NotFoundError"
         "500":
           $ref: "#/components/responses/InternalServerError"
-
   /events:
     get:
       summary: List Events
@@ -645,7 +642,6 @@ paths:
           $ref: "#/components/responses/NotFoundError"
         "500":
           $ref: "#/components/responses/InternalServerError"
-
   /transactions:
     post:
       summary: Create a transaction
