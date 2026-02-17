@@ -1,0 +1,40 @@
+{
+  "public_header": {
+    "version": "1.0",
+    "message_id": "msg_02k9rtgqtxih14ohte1qlterr4o",
+    "created_at": "2026-02-16T14:30:00Z",
+    "sender_did": "did:web:givechariot.com:payers:benevity",
+    "recipient_did": "did:web:agapay.habitat.org",
+    "recipient_ein": "910982371",
+    "total_amount": 25000,
+    "currency": "USD",
+    "number_of_transactions": 1,
+    "payment_type": "corporate_match",
+    "private_data_cid": "bafybeiah7x3q4z6hknlrpg3h5kz2j4y8n3m6v1w9t5r7u2i4o6p8a0s2d4",
+    "private_data_hash": "sha256:f1e2d3c4b5a6f7e8d9c0b1a2f3e4d5c6b7a8f9e0d1c2b3a4f5e6d7c8b9a0f1e2"
+  },
+  "private_body": {
+    "transactions": [
+      {
+        "transaction_id": "tx_01",
+        "amount": 25000,
+        "currency": "USD",
+        "description": "Corporate Matching Gift",
+        "donation": {
+          "type": "corporate_match",
+          "program_name": "Employee Matching Gifts Program",
+          "company_name": "Acme Corporation",
+          "employee_name": "Sarah Johnson"
+        },
+        "donors": [
+          {
+            "name": "Sarah Johnson",
+            "email": "sarah.johnson@acme.com"
+          }
+        ]
+      }
+    ],
+    "sender_reference": "BNV-MATCH-2026-08821",
+    "remittance_info": "Corporate Match - Acme Corporation Employee Program"
+  }
+}

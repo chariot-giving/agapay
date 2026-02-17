@@ -1,0 +1,157 @@
+# Agapay Development Environment
+# Install mise: https://mise.jdx.dev/getting-started.html
+# Then run: mise install && mise run install-tools
+
+[tools]
+go = "1.25.1"
+rust = "stable"
+node = "20"
+
+[env]
+SOLANA_RPC_URL = "https://api.devnet.solana.com"
+SOLANA_WS_URL = "wss://api.devnet.solana.com"
+IPFS_API_URL = "http://localhost:5001"
+ANCHOR_PROVIDER_URL = "https://api.devnet.solana.com"
+
+[tasks.install-solana]
+description = "Install Solana CLI (Anza)"
+run = """
+#!/usr/bin/env bash
+set -euo pipefail
+SOLANA_VERSION="v2.1.21"
+if command -v solana &>/dev/null; then
+  CURRENT=$(solana --version 2>/dev/null | awk '{print $2}')
+  echo "Solana CLI already installed: $CURRENT"
+  exit 0
+fi
+echo "Installing Solana CLI ${SOLANA_VERSION}..."
+sh -c "$(curl -sSfL https://release.anza.xyz/${SOLANA_VERSION}/install)"
+echo ""
+echo "Add to your PATH if not already present:"
+echo '  export PATH="$HOME/.local/share/solana/install/active_release/bin:$PATH"'
+"""
+
+[tasks.install-anchor]
+description = "Install Anchor CLI v0.30.1"
+run = """
+#!/usr/bin/env bash
+set -euo pipefail
+ANCHOR_VERSION="0.30.1"
+if command -v anchor &>/dev/null; then
+  CURRENT=$(anchor --version 2>/dev/null | awk '{print $2}')
+  if [ "$CURRENT" = "$ANCHOR_VERSION" ]; then
+    echo "Anchor CLI already installed: $CURRENT"
+    exit 0
+  fi
+fi
+echo "Installing Anchor CLI v${ANCHOR_VERSION} (this may take a few minutes)..."
+cargo install --git https://github.com/coral-xyz/anchor --tag v${ANCHOR_VERSION} anchor-cli --locked --force
+echo "Anchor CLI v${ANCHOR_VERSION} installed."
+"""
+
+[tasks.install-ipfs]
+description = "Install IPFS Kubo"
+run = """
+#!/usr/bin/env bash
+set -euo pipefail
+KUBO_VERSION="v0.32.1"
+if command -v ipfs &>/dev/null; then
+  CURRENT=$(ipfs version 2>/dev/null | awk '{print $3}')
+  echo "IPFS Kubo already installed: $CURRENT"
+  exit 0
+fi
+echo "Installing IPFS Kubo ${KUBO_VERSION}..."
+OS=$(uname -s | tr '[:upper:]' '[:lower:]')
+ARCH=$(uname -m)
+[[ "$ARCH" == "x86_64" ]] && ARCH="amd64"
+[[ "$ARCH" == "aarch64" || "$ARCH" == "arm64" ]] && ARCH="arm64"
+TMPDIR=$(mktemp -d)
+curl -sSfL "https://dist.ipfs.tech/kubo/${KUBO_VERSION}/kubo_${KUBO_VERSION}_${OS}-${ARCH}.tar.gz" | tar xz -C "$TMPDIR"
+sudo mv "$TMPDIR/kubo/ipfs" /usr/local/bin/
+rm -rf "$TMPDIR"
+ipfs init 2>/dev/null || true
+echo "IPFS Kubo installed. Run 'ipfs daemon' to start the local node."
+"""
+
+[tasks.install-tools]
+description = "Install all non-mise-managed tools (Solana, Anchor, IPFS)"
+depends = ["install-solana", "install-anchor", "install-ipfs"]
+run = 'echo "All tools installed."'
+
+[tasks.setup-devnet]
+description = "Configure Solana for devnet and generate authority keypair"
+run = """
+#!/usr/bin/env bash
+set -euo pipefail
+echo "Configuring Solana CLI for devnet..."
+solana config set --url devnet
+
+KEYFILE="$HOME/.config/solana/agapay-authority.json"
+if [ ! -f "$KEYFILE" ]; then
+  echo "Generating authority keypair..."
+  solana-keygen new --no-bip39-passphrase --silent --outfile "$KEYFILE"
+fi
+PUBKEY=$(solana-keygen pubkey "$KEYFILE")
+echo "Authority pubkey: $PUBKEY"
+
+echo "Requesting devnet airdrop (2 SOL)..."
+solana airdrop 2 "$PUBKEY" --url devnet || echo "Airdrop may have failed (rate limit). Try again later."
+
+echo ""
+echo "Devnet setup complete."
+echo "  Authority keypair: $KEYFILE"
+echo "  Authority pubkey:  $PUBKEY"
+echo ""
+echo "Next steps:"
+echo "  1. Build and deploy the Anchor program: mise run deploy"
+echo "  2. Run the live demo: mise run live -- --program-id <PROGRAM_ID>"
+"""
+
+[tasks.deploy]
+description = "Build and deploy the Anchor program to devnet"
+run = """
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Ensure we're using a modern Rust (avm may have switched the default)
+if command -v rustup &>/dev/null; then
+  rustup default stable >/dev/null 2>&1 || true
+fi
+
+echo "Building Anchor program..."
+anchor build
+
+echo "Deploying to devnet..."
+anchor deploy --provider.cluster devnet
+echo ""
+echo "Program deployed. Note the program ID above and use it with:"
+echo "  go run ./cmd/agapay setup --program-id <PROGRAM_ID>"
+"""
+
+[tasks.test]
+description = "Run all Go tests"
+run = "go test ./... -v"
+
+[tasks.test-quick]
+description = "Run Go tests (no verbose)"
+run = "go test ./..."
+
+[tasks.demo]
+description = "Run the simulated demo (no external dependencies)"
+run = "go run ./cmd/agapay demo"
+
+[tasks.live]
+description = "Run the live devnet demo (requires Solana devnet + IPFS)"
+run = "go run ./cmd/agapay live"
+
+[tasks.setup]
+description = "Run the Go setup command for devnet infrastructure"
+run = "go run ./cmd/agapay setup"
+
+[tasks.check]
+description = "Run build, vet, and tests"
+run = "go build ./... && go vet ./... && go test ./..."
+
+[tasks.ipfs-start]
+description = "Start the local IPFS daemon in the background"
+run = "ipfs daemon &"

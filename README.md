@@ -198,6 +198,123 @@ Subsequent requests must be identical to the original request or the API will re
 [422 Unprocessable Entity](https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/422) error.
 We discourage setting an idempotency key on `GET` and `DELETE` requests as these requests are inherently idempotent.
 
+## Proof of Concept
+
+This repository includes a working proof of concept that demonstrates the full Agapay flow:
+
+1. **Verifiable Credentials** -- W3C VC Data Model 2.0 with JWT-VC proof format (Ed25519)
+2. **Decentralized Identifiers** -- `did:web` with CNAME-delegated hosting, `did:key` for individuals
+3. **On-Chain Registry** -- Solana program (Anchor) storing a public nonprofit index
+4. **Privacy-Preserving Payments** -- ISO 20022-inspired messages with encrypted donor PII on IPFS
+5. **Stablecoin Settlement** -- USDC transfers on Solana with SPL Memo for payment metadata
+
+### Quick Start (Simulated Demo)
+
+```bash
+# Run the simulated E2E demo (no external dependencies needed)
+go run ./cmd/agapay demo
+```
+
+### Quick Start (Live Devnet Demo)
+
+The live demo runs the full flow against real Solana devnet and a local IPFS node.
+
+**Prerequisites (using [mise](https://mise.jdx.dev)):**
+
+```bash
+# Install mise if not already installed
+curl https://mise.jdx.dev/install.sh | sh
+
+# Install pinned tool versions (Go, Rust, Node.js)
+mise install
+
+# Install Solana CLI, Anchor CLI, and IPFS Kubo
+mise run install-tools
+```
+
+**Deploy and run:**
+
+```bash
+# Start the local IPFS daemon (in a separate terminal)
+ipfs daemon
+
+# Build and deploy the Anchor program to devnet
+mise run deploy
+
+# Run the setup command (creates test mint, airdrops SOL, saves config)
+go run ./cmd/agapay setup --program-id <PROGRAM_ID_FROM_DEPLOY>
+
+# Run the live devnet demo
+go run ./cmd/agapay live
+```
+
+**Or use mise tasks:**
+
+```bash
+mise run setup-devnet   # Configure Solana CLI for devnet
+mise run deploy         # Build + deploy Anchor program
+mise run setup          # Run Go setup command
+mise run live           # Run the live demo
+```
+
+### Other CLI Commands
+
+```bash
+# Issue credentials for a nonprofit
+go run ./cmd/agapay issue --ein 530196605 --name "American Red Cross" --domain redcross.org
+
+# Send a payment (simulated)
+go run ./cmd/agapay pay --ein 530196605 --amount 50000 --donor-name "John Doe" --donor-email "john@example.com"
+```
+
+### Project Structure
+
+```
+agapay/
+├── mise.toml                      # Reproducible dev environment (tools, env, tasks)
+├── spec/                          # Specifications and schemas
+│   ├── credentials/               # VC JSON-LD schemas (4 credential types)
+│   ├── messages/                  # ISO 20022-inspired payment message schema + examples
+│   └── protocol/                  # Protocol specification documents
+│       ├── identity.md            # DID methods, CNAME hosting, VC spec
+│       ├── registry.md            # On-chain registry design
+│       ├── messages.md            # Payment message format
+│       └── settlement.md          # Stablecoin settlement
+├── programs/                      # Solana programs (Anchor/Rust)
+│   └── agapay-registry/           # On-chain nonprofit registry
+├── pkg/                           # Go library packages
+│   ├── did/                       # DID creation, resolution, CNAME hosting
+│   ├── credential/                # VC issuance (JWT-VC) and verification
+│   ├── message/                   # Payment messages with hybrid encryption
+│   ├── ipfs/                      # IPFS client (real + mock) for encrypted data storage
+│   ├── registry/                  # Solana registry client + instruction builders
+│   └── settlement/                # USDC payment with SPL Memo + devnet helpers
+├── cmd/agapay/                    # CLI tool (demo, setup, live, issue, verify, pay, decrypt)
+└── tests/                         # Anchor integration tests
+```
+
+### Key Design Decisions
+
+1. **DID Hosting via CNAME**: Nonprofits add one DNS record (`agapay.redcross.org CNAME dids.givechariot.com`) and get a fully functional `did:web` identity without running any infrastructure. Self-sovereignty preserved: they can revoke the CNAME and self-host at any time.
+
+2. **Privacy-Preserving Payments**: On-chain data is limited to amounts, payment types, and IPFS CIDs. All PII (donor names, emails, addresses, fund details) is encrypted to the recipient's X25519 public key and stored on IPFS. The on-chain hash allows tamper verification.
+
+3. **ISO 20022 Alignment**: The `AgapayPaymentInstruction` format maps to ISO 20022 concepts (`pain.001`) but uses JSON and is tailored for charitable payments (DAF grants, corporate matches, QCDs).
+
+4. **Separation of Concerns**: Identity (VCs + DIDs), registry (Solana), data (IPFS), and settlement (USDC) are independent layers that can be swapped independently.
+
+### Running Tests
+
+```bash
+# Go unit tests (DID, credential, message encrypt/decrypt, IPFS)
+go test ./...
+
+# Solana program tests (requires Anchor and local validator)
+anchor test
+```
+
+---
+
 ## Future Roadmap & Strategy
 
 The vision for this project is to create a truly open database and network for payments to nonprofits.

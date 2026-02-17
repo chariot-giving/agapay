@@ -1,0 +1,48 @@
+{
+  "public_header": {
+    "version": "1.0",
+    "message_id": "msg_03l0suhruyin25piuf2rmufss5p",
+    "created_at": "2026-02-16T09:15:00Z",
+    "sender_did": "did:web:givechariot.com:payers:fidelity",
+    "recipient_did": "did:web:agapay.stjude.org",
+    "recipient_ein": "620646012",
+    "total_amount": 100000,
+    "currency": "USD",
+    "number_of_transactions": 1,
+    "payment_type": "qualified_charitable_distribution",
+    "private_data_cid": "bafybeicj8k4l5m6n7o8p9q0r1s2t3u4v5w6x7y8z9a0b1c2d3e4f5g6h7i8",
+    "private_data_hash": "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+  },
+  "private_body": {
+    "transactions": [
+      {
+        "transaction_id": "tx_01",
+        "amount": 100000,
+        "currency": "USD",
+        "description": "Qualified Charitable Distribution",
+        "donation": {
+          "type": "qualified_charitable_distribution",
+          "account_name": "Robert Williams Traditional IRA",
+          "organization_name": "Fidelity Investments"
+        },
+        "donors": [
+          {
+            "name": "Robert Williams",
+            "email": "robert.williams@example.com",
+            "phone": "212-555-9876",
+            "address": {
+              "line1": "456 Park Avenue",
+              "line2": "Apt 12B",
+              "city": "New York",
+              "state": "NY",
+              "postalCode": "10022",
+              "country": "US"
+            }
+          }
+        ]
+      }
+    ],
+    "sender_reference": "FID-QCD-2026-44102",
+    "remittance_info": "QCD - 2026 Required Minimum Distribution"
+  }
+}

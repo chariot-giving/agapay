@@ -1,0 +1,24 @@
+[package]
+name = "agapay-registry"
+version = "0.1.0"
+description = "Agapay on-chain nonprofit registry program for Solana"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "lib"]
+name = "agapay_registry"
+
+[features]
+no-entrypoint = []
+no-idl = []
+no-log-ix-name = []
+cpi = ["no-entrypoint"]
+default = []
+idl-build = ["anchor-lang/idl-build", "anchor-spl/idl-build"]
+
+[dependencies]
+anchor-lang = "0.30"
+anchor-spl = "0.30"
+# Pin blake3 to avoid constant_time_eq >= 0.4 which requires edition2024
+# (incompatible with Solana platform-tools v1.51 / rustc 1.84.1)
+blake3 = "=1.6.1"

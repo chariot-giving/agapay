@@ -1,0 +1,19 @@
+[features]
+seeds = false
+skip-lint = false
+
+[programs.localnet]
+agapay_registry = "HBtGrueW38KAi6CAfVG22MJopasM47GY6DFvq2W1U98j"
+
+[programs.devnet]
+agapay_registry = "HBtGrueW38KAi6CAfVG22MJopasM47GY6DFvq2W1U98j"
+
+[registry]
+url = "https://api.apr.dev"
+
+[provider]
+cluster = "Devnet"
+wallet = "~/.config/solana/id.json"
+
+[scripts]
+test = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 tests/**/*.ts"

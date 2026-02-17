@@ -1,14 +1,36 @@
 # MacOS system files
 .DS_Store
 
-# Build files
-dist
+# Build artifacts
+dist/
+/agapay
 
-agapay
+# Rust / Cargo / Anchor build artifacts
+target/
+.anchor/
 
-# Env files
+# Node.js
+node_modules/
+
+# Environment & secrets
 .env
+.env.*
 *.log
 
+# Temporary files
 /tmp
-node_modules
+
+# Mise local overrides
+mise.local.toml
+
+# Agapay local config (keypairs, mint addresses)
+.agapay/
+
+# Solana CLI config (keypairs)
+*.json.bak
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo

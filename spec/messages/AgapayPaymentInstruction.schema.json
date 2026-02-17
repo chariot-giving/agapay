@@ -1,0 +1,198 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agapay.org/schemas/AgapayPaymentInstruction/v1",
+  "title": "AgapayPaymentInstruction",
+  "description": "ISO 20022-inspired payment message format for the Agapay charitable payment network. Split into a public header (on-chain) and encrypted private body (IPFS).",
+  "type": "object",
+  "required": ["public_header", "private_body"],
+  "properties": {
+    "public_header": { "$ref": "#/$defs/PublicHeader" },
+    "private_body": { "$ref": "#/$defs/PrivateBody" }
+  },
+  "$defs": {
+    "PublicHeader": {
+      "type": "object",
+      "description": "Public payment metadata stored on-chain in SPL Memo. Contains no PII.",
+      "required": [
+        "version", "message_id", "created_at", "sender_did", "recipient_did",
+        "recipient_ein", "total_amount", "currency", "number_of_transactions",
+        "payment_type", "private_data_cid", "private_data_hash"
+      ],
+      "properties": {
+        "version": {
+          "type": "string",
+          "const": "1.0",
+          "description": "Protocol version"
+        },
+        "message_id": {
+          "type": "string",
+          "description": "Unique message identifier",
+          "pattern": "^msg_[a-zA-Z0-9]+$"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Message creation timestamp (ISO 8601)"
+        },
+        "sender_did": {
+          "type": "string",
+          "description": "DID of the sending entity",
+          "pattern": "^did:"
+        },
+        "recipient_did": {
+          "type": "string",
+          "description": "DID of the recipient organization",
+          "pattern": "^did:"
+        },
+        "recipient_ein": {
+          "type": "string",
+          "description": "EIN of the recipient entity (9 digits)",
+          "pattern": "^[0-9]{9}$"
+        },
+        "total_amount": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Total payment amount in minor currency units (cents)"
+        },
+        "currency": {
+          "type": "string",
+          "description": "ISO 4217 currency code",
+          "pattern": "^[A-Z]{3}$"
+        },
+        "number_of_transactions": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Number of individual donation line items"
+        },
+        "payment_type": {
+          "$ref": "#/$defs/DonationType"
+        },
+        "private_data_cid": {
+          "type": "string",
+          "description": "IPFS Content Identifier (CID) of the encrypted private body"
+        },
+        "private_data_hash": {
+          "type": "string",
+          "description": "SHA-256 hash of the plaintext private body for integrity verification",
+          "pattern": "^sha256:[a-f0-9]{64}$"
+        }
+      }
+    },
+    "PrivateBody": {
+      "type": "object",
+      "description": "Private payment data encrypted and stored on IPFS. Contains PII.",
+      "required": ["transactions"],
+      "properties": {
+        "transactions": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/Transaction" },
+          "minItems": 1,
+          "description": "Individual donation line items"
+        },
+        "sender_reference": {
+          "type": "string",
+          "description": "Payer's internal reference number"
+        },
+        "remittance_info": {
+          "type": "string",
+          "description": "Free-text remittance information"
+        }
+      }
+    },
+    "Transaction": {
+      "type": "object",
+      "required": ["amount", "currency"],
+      "properties": {
+        "transaction_id": {
+          "type": "string",
+          "description": "Identifier for this line item within the message"
+        },
+        "amount": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Transaction amount in minor currency units (cents)"
+        },
+        "currency": {
+          "type": "string",
+          "pattern": "^[A-Z]{3}$"
+        },
+        "description": {
+          "type": "string",
+          "description": "Human-readable description of the transaction"
+        },
+        "donation": { "$ref": "#/$defs/Donation" },
+        "donors": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/Donor" }
+        },
+        "attachments": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/Attachment" }
+        }
+      }
+    },
+    "DonationType": {
+      "type": "string",
+      "enum": ["donor_advised_fund_grant", "corporate_match", "qualified_charitable_distribution"]
+    },
+    "Donation": {
+      "type": "object",
+      "required": ["type"],
+      "properties": {
+        "type": { "$ref": "#/$defs/DonationType" },
+        "organization_name": { "type": "string" },
+        "fund_name": { "type": "string" },
+        "purpose": { "type": "string" },
+        "note": { "type": "string" },
+        "program_name": { "type": "string" },
+        "company_name": { "type": "string" },
+        "employee_name": { "type": "string" },
+        "account_name": { "type": "string" }
+      }
+    },
+    "Donor": {
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "phone": { "type": "string" },
+        "address": { "$ref": "#/$defs/PostalAddress" }
+      }
+    },
+    "PostalAddress": {
+      "type": "object",
+      "properties": {
+        "line1": { "type": "string" },
+        "line2": { "type": "string" },
+        "city": { "type": "string" },
+        "state": { "type": "string" },
+        "postalCode": { "type": "string" },
+        "country": { "type": "string" }
+      }
+    },
+    "Attachment": {
+      "type": "object",
+      "required": ["type"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["grant_letter", "tax_document", "other"]
+        },
+        "description": { "type": "string" },
+        "ipfs_cid": { "type": "string" }
+      }
+    },
+    "EncryptedEnvelope": {
+      "type": "object",
+      "description": "Encrypted private body stored on IPFS",
+      "required": ["version", "algorithm", "ephemeral_public_key", "nonce", "ciphertext"],
+      "properties": {
+        "version": { "type": "string", "const": "1.0" },
+        "algorithm": { "type": "string", "const": "ECDH-ES+AES256GCM" },
+        "ephemeral_public_key": { "type": "string", "description": "Base64-encoded X25519 ephemeral public key" },
+        "nonce": { "type": "string", "description": "Base64-encoded 12-byte nonce" },
+        "ciphertext": { "type": "string", "description": "Base64-encoded AES-256-GCM ciphertext (includes auth tag)" }
+      }
+    }
+  }
+}
