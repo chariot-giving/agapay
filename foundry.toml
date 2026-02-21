@@ -1,0 +1,16 @@
+[profile.default]
+src = "contracts/tempo/src"
+test = "contracts/tempo/test"
+script = "contracts/tempo/script"
+out = "out"
+libs = ["lib"]
+solc_version = "0.8.24"
+
+[profile.ci]
+fuzz = { runs = 1000 }
+
+[rpc_endpoints]
+tempo_testnet = "${TEMPO_RPC_URL}"
+
+[etherscan]
+tempo_testnet = { key = "", url = "https://contracts.tempo.xyz" }

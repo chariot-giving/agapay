@@ -1,9 +1,12 @@
 # MacOS system files
 .DS_Store
 
-# Build artifacts
-dist/
+# Go binary
 /agapay
+
+# Foundry build output
+out/
+cache/
 
 # Rust / Cargo / Anchor build artifacts
 target/

@@ -4,7 +4,7 @@
 package main
 
 import (
-	"crypto/sha256"
+	"context"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -17,6 +17,7 @@ import (
 	"github.com/chariot-giving/agapay/pkg/ipfs"
 	"github.com/chariot-giving/agapay/pkg/message"
 	"github.com/chariot-giving/agapay/pkg/registry"
+	"github.com/chariot-giving/agapay/pkg/settlement"
 	"github.com/spf13/cobra"
 )
 
@@ -102,7 +103,6 @@ func runDemo(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("create issuer: %w", err)
 	}
 
-	// Entity VC
 	entityVC, err := issuer.IssueNonprofitEntity(nonprofitDID, &credential.NonprofitEntityClaims{
 		EIN:       "530196605",
 		LegalName: "American National Red Cross",
@@ -128,7 +128,6 @@ func runDemo(cmd *cobra.Command, args []string) error {
 	}
 	fmt.Printf("  NonprofitEntityCredential: %s...\n", entityVC[:80])
 
-	// Control Person VC
 	personVC, err := issuer.IssueControlPerson(personDID, &credential.ControlPersonClaims{
 		FullName:  "Gail McGovern",
 		Title:     "President & CEO",
@@ -142,7 +141,6 @@ func runDemo(cmd *cobra.Command, args []string) error {
 	}
 	fmt.Printf("  ControlPersonCredential:   %s...\n", personVC[:80])
 
-	// Organization VC
 	orgVC, err := issuer.IssueOrganization(nonprofitDID, &credential.OrganizationClaims{
 		OrganizationName: "American Red Cross",
 		Domain:           "redcross.org",
@@ -157,7 +155,6 @@ func runDemo(cmd *cobra.Command, args []string) error {
 	}
 	fmt.Printf("  OrganizationCredential:    %s...\n", orgVC[:80])
 
-	// Address VC
 	addrVC, err := issuer.IssueAddress(nonprofitDID, &credential.AddressClaims{
 		OrganizationDID:         nonprofitDID,
 		OrganizationEIN:         "530196605",
@@ -188,7 +185,7 @@ func runDemo(cmd *cobra.Command, args []string) error {
 	// -----------------------------------------------------------------------
 	// Step 4: Simulate on-chain registry registration
 	// -----------------------------------------------------------------------
-	printStep(4, "Registering on the Solana on-chain registry (simulated)")
+	printStep(4, "Registering on the on-chain registry (simulated)")
 
 	vcHash := registry.ComputeVCHash(entityVC, orgVC, addrVC)
 	fmt.Printf("  EIN: 530196605\n")
@@ -198,7 +195,7 @@ func runDemo(cmd *cobra.Command, args []string) error {
 	fmt.Printf("  VC Hash: %s\n", hex.EncodeToString(vcHash[:]))
 	fmt.Printf("  USDC Address: 7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU\n")
 	fmt.Printf("  Status: Active\n")
-	fmt.Printf("  (In production, this would be a Solana transaction creating an OrganizationAccount PDA)\n")
+	fmt.Printf("  (In production, this would be an on-chain transaction creating an Organization record)\n")
 
 	// -----------------------------------------------------------------------
 	// Step 5: Verify a VC (payer side)
@@ -285,7 +282,6 @@ func runDemo(cmd *cobra.Command, args []string) error {
 	fmt.Printf("  Encryption algorithm: %s\n", envelope.Algorithm)
 	fmt.Printf("  Ephemeral public key: %s...\n", envelope.EphemeralPublicKey[:40])
 
-	// Pin to mock IPFS
 	mockIPFS := ipfs.NewMockClient()
 	cid, err := mockIPFS.PinJSON(envelope)
 	if err != nil {
@@ -302,18 +298,17 @@ func runDemo(cmd *cobra.Command, args []string) error {
 	headerJSON, _ := json.MarshalIndent(header, "  ", "  ")
 	fmt.Printf("  SPL Memo (public header on-chain):\n  %s\n", string(headerJSON))
 	fmt.Printf("  USDC Amount: %d units ($%.2f)\n",
-		uint64(header.TotalAmount)*10000,
+		settlement.CentsToUSDCUnits(header.TotalAmount),
 		float64(header.TotalAmount)/100)
 	fmt.Printf("  From: Payer USDC ATA\n")
 	fmt.Printf("  To: 7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU\n")
-	fmt.Printf("  (In production, this would be a Solana transaction with SPL Token transfer + Memo)\n")
+	fmt.Printf("  (In production, this would be an on-chain transaction with stablecoin transfer + memo)\n")
 
 	// -----------------------------------------------------------------------
 	// Step 9: Recipient decrypts payment data
 	// -----------------------------------------------------------------------
 	printStep(9, "Recipient retrieves and decrypts payment data")
 
-	// Retrieve from mock IPFS
 	var retrievedEnvelope message.EncryptedEnvelope
 	if err := mockIPFS.RetrieveJSON(cid, &retrievedEnvelope); err != nil {
 		return fmt.Errorf("retrieve from IPFS: %w", err)
@@ -365,7 +360,7 @@ This demo showed the full Agapay flow:
   2. A DID Document was generated for the nonprofit using
      CNAME-delegated hosting (agapay.redcross.org -> dids.givechariot.com)
 
-  3. The organization was registered on the Solana on-chain registry
+  3. The organization was registered on the on-chain registry
      with VC hash for integrity verification
 
   4. A payer built an ISO 20022-inspired payment message:
@@ -392,21 +387,20 @@ func issueCmd() *cobra.Command {
 				return fmt.Errorf("EIN must be exactly 9 digits")
 			}
 
-			// Generate issuer keypair
 			chariotKP, err := did.GenerateKeyPair()
 			if err != nil {
 				return err
 			}
 			chariotDID := "did:web:givechariot.com"
 
-			issuer, err := credential.NewIssuer(chariotDID, chariotKP.PrivateKey)
+			iss, err := credential.NewIssuer(chariotDID, chariotKP.PrivateKey)
 			if err != nil {
 				return err
 			}
 
 			nonprofitDID := "did:web:agapay." + domain
 
-			orgVC, err := issuer.IssueOrganization(nonprofitDID, &credential.OrganizationClaims{
+			orgVC, err := iss.IssueOrganization(nonprofitDID, &credential.OrganizationClaims{
 				OrganizationName: name,
 				Domain:           domain,
 				EntityDID:        nonprofitDID,
@@ -419,7 +413,7 @@ func issueCmd() *cobra.Command {
 
 			fmt.Printf("Issued OrganizationCredential:\n%s\n", orgVC)
 
-			entityVC, err := issuer.IssueNonprofitEntity(nonprofitDID, &credential.NonprofitEntityClaims{
+			entityVC, err := iss.IssueNonprofitEntity(nonprofitDID, &credential.NonprofitEntityClaims{
 				EIN:       ein,
 				LegalName: name,
 			})
@@ -449,13 +443,10 @@ func verifyCmd() *cobra.Command {
 		Use:   "verify",
 		Short: "Verify a Verifiable Credential JWT",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// For the PoC, we parse without verification to show claims
-			// In production, you'd resolve the issuer DID to get the public key
 			fmt.Println("Parsing VC-JWT (signature verification requires issuer public key)...")
 
 			verifier := credential.NewVerifier()
 
-			// Generate a dummy key since we can't verify without the issuer key
 			kp, _ := did.GenerateKeyPair()
 			result, err := verifier.Verify(vcToken, kp.PublicKey)
 			if err != nil {
@@ -484,31 +475,50 @@ func verifyCmd() *cobra.Command {
 }
 
 func lookupCmd() *cobra.Command {
-	var ein, rpcURL string
+	var ein string
 
 	cmd := &cobra.Command{
 		Use:   "lookup",
-		Short: "Look up an organization on the Solana registry",
+		Short: "Look up an organization on the registry",
+		Long: `Look up an organization by EIN on the configured chain's registry.
+Requires 'agapay setup' to have been run first to configure the chain and
+contract addresses.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			fmt.Printf("Looking up EIN %s on the Agapay registry...\n\n", ein)
 
-			if rpcURL != "" {
-				// Real Solana lookup
-				// For now, simulate since we need a deployed program
-				fmt.Printf("RPC URL: %s\n", rpcURL)
+			cfg, err := loadConfig()
+			if err != nil {
+				fmt.Printf("  (No config found. Run 'agapay setup' to connect to a live registry.)\n")
+				fmt.Printf("  EIN: %s\n", ein)
+				fmt.Printf("  Use 'agapay demo' to see the full flow with simulated data.\n")
+				return nil
 			}
 
-			// Simulate lookup result
+			reg, err := newRegistry(cfg)
+			if err != nil {
+				return fmt.Errorf("create registry client: %w", err)
+			}
+
+			fmt.Printf("  Chain: %s\n\n", chainName(cfg))
+
+			ctx := context.Background()
+			org, err := reg.GetOrganization(ctx, ein)
+			if err != nil {
+				return fmt.Errorf("lookup failed: %w", err)
+			}
+
 			fmt.Printf("Organization found:\n")
-			fmt.Printf("  EIN: %s\n", ein)
-			fmt.Printf("  (Full lookup requires a deployed Agapay Registry program on Solana)\n")
-			fmt.Printf("  Use 'agapay demo' to see the full flow with simulated data.\n")
+			fmt.Printf("  EIN:             %s\n", org.EIN)
+			fmt.Printf("  Name:            %s\n", org.Name)
+			fmt.Printf("  Domain:          %s\n", org.Domain)
+			fmt.Printf("  DID:             %s\n", org.DIDURI)
+			fmt.Printf("  Payment Address: %s\n", org.PaymentAddress)
+			fmt.Printf("  Active:          %t\n", org.Active)
 			return nil
 		},
 	}
 
 	cmd.Flags().StringVar(&ein, "ein", "", "EIN to look up (9 digits)")
-	cmd.Flags().StringVar(&rpcURL, "rpc", "", "Solana RPC URL (optional)")
 	cmd.MarkFlagRequired("ein")
 
 	return cmd
@@ -524,7 +534,6 @@ func payCmd() *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			fmt.Printf("Building payment to EIN %s...\n\n", ein)
 
-			// Generate a recipient keypair for encryption demo
 			recipientKP, _ := did.GenerateKeyPair()
 
 			instruction := &message.AgapayPaymentInstruction{
@@ -554,13 +563,11 @@ func payCmd() *cobra.Command {
 				return err
 			}
 
-			// Encrypt
 			envelope, err := message.Encrypt(body, recipientKP.EncryptionPublicKey)
 			if err != nil {
 				return err
 			}
 
-			// Pin to mock IPFS
 			mockIPFS := ipfs.NewMockClient()
 			cid, err := mockIPFS.PinJSON(envelope)
 			if err != nil {
@@ -572,9 +579,9 @@ func payCmd() *cobra.Command {
 			fmt.Printf("Public Header (on-chain):\n%s\n\n", string(headerJSON))
 			fmt.Printf("Private Data CID: %s\n", cid)
 			fmt.Printf("USDC Amount: %d units ($%.2f)\n",
-				uint64(amount)*10000,
+				settlement.CentsToUSDCUnits(amount),
 				float64(amount)/100)
-			fmt.Printf("\n(In production, this would submit a Solana transaction)\n")
+			fmt.Printf("\n(In production, this would submit an on-chain transaction)\n")
 
 			return nil
 		},
@@ -633,6 +640,3 @@ func printHeader(title string) {
 func printStep(num int, description string) {
 	fmt.Printf("\n--- Step %d: %s ---\n\n", num, description)
 }
-
-// Ensure sha256 import is used
-var _ = sha256.New

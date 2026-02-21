@@ -204,9 +204,9 @@ This repository includes a working proof of concept that demonstrates the full A
 
 1. **Verifiable Credentials** -- W3C VC Data Model 2.0 with JWT-VC proof format (Ed25519)
 2. **Decentralized Identifiers** -- `did:web` with CNAME-delegated hosting, `did:key` for individuals
-3. **On-Chain Registry** -- Solana program (Anchor) storing a public nonprofit index
+3. **On-Chain Registry** -- Multi-chain nonprofit registry (Solana Anchor + Tempo Solidity)
 4. **Privacy-Preserving Payments** -- ISO 20022-inspired messages with encrypted donor PII on IPFS
-5. **Stablecoin Settlement** -- USDC transfers on Solana with SPL Memo for payment metadata
+5. **Stablecoin Settlement** -- Multi-chain support: USDC on Solana (SPL Memo) or TIP-20 on Tempo (`transferWithMemo`)
 
 ### Quick Start (Simulated Demo)
 
@@ -215,9 +215,52 @@ This repository includes a working proof of concept that demonstrates the full A
 go run ./cmd/agapay demo
 ```
 
-### Quick Start (Live Devnet Demo)
+### Quick Start (Tempo Testnet)
 
-The live demo runs the full flow against real Solana devnet and a local IPFS node.
+The Tempo demo runs the full flow against real contracts on Tempo's Moderato testnet. No IPFS required (falls back to in-memory mock).
+
+**Prerequisites:**
+
+```bash
+# Install Tempo's Foundry fork
+curl -L https://foundry.paradigm.xyz | bash
+foundryup -n tempo
+
+# Create and fund a wallet
+cast wallet new
+cast rpc tempo_fundAddress 0x<YOUR_ADDRESS> --rpc-url https://rpc.moderato.tempo.xyz
+
+# Deploy contracts (from repo root)
+forge create contracts/tempo/src/AgapayRegistry.sol:AgapayRegistry \
+  --tempo.fee-token 0x20c0000000000000000000000000000000000001 \
+  --rpc-url https://rpc.moderato.tempo.xyz --private-key 0x<KEY> --broadcast --verify
+
+forge create contracts/tempo/src/AgapayPaymentRouter.sol:AgapayPaymentRouter \
+  --tempo.fee-token 0x20c0000000000000000000000000000000000001 \
+  --rpc-url https://rpc.moderato.tempo.xyz --private-key 0x<KEY> --broadcast --verify
+```
+
+**Configure and run:**
+
+```bash
+# Save contract addresses and private key to config
+go run ./cmd/agapay setup --chain tempo \
+  --registry 0x<REGISTRY> --router 0x<ROUTER> \
+  --token 0x20c0000000000000000000000000000000000001 \
+  --private-key <HEX_KEY_WITHOUT_0x>
+
+# Run the full E2E demo on Tempo testnet
+go run ./cmd/agapay live --chain tempo
+
+# Look up an organization on-chain
+go run ./cmd/agapay lookup --ein 530196605
+```
+
+See [`contracts/tempo/README.md`](contracts/tempo/README.md) for the complete walkthrough including `cast`/`forge` commands.
+
+### Quick Start (Solana Devnet)
+
+The Solana demo runs the full flow against Solana devnet and a local IPFS node.
 
 **Prerequisites (using [mise](https://mise.jdx.dev)):**
 
@@ -248,15 +291,6 @@ go run ./cmd/agapay setup --program-id <PROGRAM_ID_FROM_DEPLOY>
 go run ./cmd/agapay live
 ```
 
-**Or use mise tasks:**
-
-```bash
-mise run setup-devnet   # Configure Solana CLI for devnet
-mise run deploy         # Build + deploy Anchor program
-mise run setup          # Run Go setup command
-mise run live           # Run the live demo
-```
-
 ### Other CLI Commands
 
 ```bash
@@ -276,21 +310,26 @@ agapay/
 │   ├── credentials/               # VC JSON-LD schemas (4 credential types)
 │   ├── messages/                  # ISO 20022-inspired payment message schema + examples
 │   └── protocol/                  # Protocol specification documents
-│       ├── identity.md            # DID methods, CNAME hosting, VC spec
-│       ├── registry.md            # On-chain registry design
-│       ├── messages.md            # Payment message format
-│       └── settlement.md          # Stablecoin settlement
-├── programs/                      # Solana programs (Anchor/Rust)
-│   └── agapay-registry/           # On-chain nonprofit registry
+├── contracts/                     # Smart contracts (multi-chain)
+│   ├── tempo/                     # Tempo EVM contracts (Solidity / Foundry)
+│   │   ├── src/                   # AgapayRegistry.sol, AgapayPaymentRouter.sol
+│   │   ├── test/                  # Forge tests
+│   │   └── script/                # Deployment scripts
+│   └── solana/                    # Solana contracts (Anchor / Rust)
+│       ├── programs/              # agapay-registry Anchor program
+│       └── tests/                 # Anchor integration tests (TypeScript)
 ├── pkg/                           # Go library packages
+│   ├── chain/                     # Chain-agnostic types (Address, TxHash, ChainID)
 │   ├── did/                       # DID creation, resolution, CNAME hosting
 │   ├── credential/                # VC issuance (JWT-VC) and verification
 │   ├── message/                   # Payment messages with hybrid encryption
 │   ├── ipfs/                      # IPFS client (real + mock) for encrypted data storage
-│   ├── registry/                  # Solana registry client + instruction builders
-│   └── settlement/                # USDC payment with SPL Memo + devnet helpers
+│   ├── registry/                  # Registry interface + Solana/Tempo implementations
+│   └── settlement/                # Settler interface + Solana/Tempo implementations
 ├── cmd/agapay/                    # CLI tool (demo, setup, live, issue, verify, pay, decrypt)
-└── tests/                         # Anchor integration tests
+├── foundry.toml                   # Foundry config (Tempo fork)
+├── go.mod                         # Go module
+└── lib/                           # Foundry dependencies (forge-std)
 ```
 
 ### Key Design Decisions
@@ -309,8 +348,11 @@ agapay/
 # Go unit tests (DID, credential, message encrypt/decrypt, IPFS)
 go test ./...
 
+# Tempo contract tests (Foundry)
+forge test -vvv
+
 # Solana program tests (requires Anchor and local validator)
-anchor test
+cd contracts/solana && anchor test
 ```
 
 ---

@@ -1,11 +1,11 @@
-package settlement
+package solana
 
 import (
 	"context"
 	"fmt"
 	"time"
 
-	"github.com/gagliardetto/solana-go"
+	solanago "github.com/gagliardetto/solana-go"
 	associatedtokenaccount "github.com/gagliardetto/solana-go/programs/associated-token-account"
 	"github.com/gagliardetto/solana-go/programs/system"
 	"github.com/gagliardetto/solana-go/programs/token"
@@ -15,13 +15,12 @@ import (
 )
 
 // AirdropSOL requests an airdrop of SOL from the devnet faucet.
-func AirdropSOL(ctx context.Context, rpcClient *rpc.Client, pubkey solana.PublicKey, lamports uint64) error {
+func AirdropSOL(ctx context.Context, rpcClient *rpc.Client, pubkey solanago.PublicKey, lamports uint64) error {
 	sig, err := rpcClient.RequestAirdrop(ctx, pubkey, lamports, rpc.CommitmentFinalized)
 	if err != nil {
 		return fmt.Errorf("request airdrop: %w", err)
 	}
 
-	// Poll for confirmation
 	for i := 0; i < 30; i++ {
 		time.Sleep(time.Second)
 		status, err := rpcClient.GetSignatureStatuses(ctx, false, sig)
@@ -40,107 +39,102 @@ func AirdropSOL(ctx context.Context, rpcClient *rpc.Client, pubkey solana.Public
 }
 
 // CreateTestMint creates a new SPL token mint on devnet (acts as "test USDC").
-// Returns the mint public key and the mint authority keypair.
 func CreateTestMint(
 	ctx context.Context,
 	rpcClient *rpc.Client,
-	payer solana.PrivateKey,
+	payer solanago.PrivateKey,
 	decimals uint8,
 	wsURL string,
-) (solana.PublicKey, solana.PrivateKey, error) {
-	mintKeypair, err := solana.NewRandomPrivateKey()
+) (solanago.PublicKey, solanago.PrivateKey, error) {
+	mintKeypair, err := solanago.NewRandomPrivateKey()
 	if err != nil {
-		return solana.PublicKey{}, solana.PrivateKey{}, fmt.Errorf("generate mint keypair: %w", err)
+		return solanago.PublicKey{}, solanago.PrivateKey{}, fmt.Errorf("generate mint keypair: %w", err)
 	}
 
 	mintPubkey := mintKeypair.PublicKey()
 	payerPubkey := payer.PublicKey()
 
-	// Calculate rent-exempt minimum for a Mint account (82 bytes)
 	rentExempt, err := rpcClient.GetMinimumBalanceForRentExemption(ctx, token.MINT_SIZE, rpc.CommitmentFinalized)
 	if err != nil {
-		return solana.PublicKey{}, solana.PrivateKey{}, fmt.Errorf("get rent exemption: %w", err)
+		return solanago.PublicKey{}, solanago.PrivateKey{}, fmt.Errorf("get rent exemption: %w", err)
 	}
 
-	// Build instructions: create account + initialize mint
 	createAccountIx := system.NewCreateAccountInstruction(
 		rentExempt,
 		token.MINT_SIZE,
-		solana.TokenProgramID,
+		solanago.TokenProgramID,
 		payerPubkey,
 		mintPubkey,
 	).Build()
 
 	initMintIx := token.NewInitializeMint2Instruction(
 		decimals,
-		payerPubkey,  // mint authority
-		payerPubkey,  // freeze authority
+		payerPubkey,
+		payerPubkey,
 		mintPubkey,
 	).Build()
 
 	recent, err := rpcClient.GetLatestBlockhash(ctx, rpc.CommitmentFinalized)
 	if err != nil {
-		return solana.PublicKey{}, solana.PrivateKey{}, fmt.Errorf("get blockhash: %w", err)
+		return solanago.PublicKey{}, solanago.PrivateKey{}, fmt.Errorf("get blockhash: %w", err)
 	}
 
-	tx, err := solana.NewTransaction(
-		[]solana.Instruction{createAccountIx, initMintIx},
+	tx, err := solanago.NewTransaction(
+		[]solanago.Instruction{createAccountIx, initMintIx},
 		recent.Value.Blockhash,
-		solana.TransactionPayer(payerPubkey),
+		solanago.TransactionPayer(payerPubkey),
 	)
 	if err != nil {
-		return solana.PublicKey{}, solana.PrivateKey{}, fmt.Errorf("create transaction: %w", err)
+		return solanago.PublicKey{}, solanago.PrivateKey{}, fmt.Errorf("create transaction: %w", err)
 	}
 
-	_, err = tx.Sign(func(key solana.PublicKey) *solana.PrivateKey {
+	_, err = tx.Sign(func(key solanago.PublicKey) *solanago.PrivateKey {
 		if key.Equals(payerPubkey) {
 			return &payer
 		}
 		if key.Equals(mintPubkey) {
-			pk := solana.PrivateKey(mintKeypair)
+			pk := solanago.PrivateKey(mintKeypair)
 			return &pk
 		}
 		return nil
 	})
 	if err != nil {
-		return solana.PublicKey{}, solana.PrivateKey{}, fmt.Errorf("sign transaction: %w", err)
+		return solanago.PublicKey{}, solanago.PrivateKey{}, fmt.Errorf("sign transaction: %w", err)
 	}
 
 	wsClient, err := ws.Connect(ctx, wsURL)
 	if err != nil {
-		return solana.PublicKey{}, solana.PrivateKey{}, fmt.Errorf("connect websocket: %w", err)
+		return solanago.PublicKey{}, solanago.PrivateKey{}, fmt.Errorf("connect websocket: %w", err)
 	}
 	defer wsClient.Close()
 
 	_, err = confirm.SendAndConfirmTransaction(ctx, rpcClient, wsClient, tx)
 	if err != nil {
-		return solana.PublicKey{}, solana.PrivateKey{}, fmt.Errorf("send create mint: %w", err)
+		return solanago.PublicKey{}, solanago.PrivateKey{}, fmt.Errorf("send create mint: %w", err)
 	}
 
-	return mintPubkey, solana.PrivateKey(mintKeypair), nil
+	return mintPubkey, solanago.PrivateKey(mintKeypair), nil
 }
 
 // CreateATA creates an Associated Token Account for the given owner and mint.
-// Returns the ATA address.
 func CreateATA(
 	ctx context.Context,
 	rpcClient *rpc.Client,
-	payer solana.PrivateKey,
-	owner solana.PublicKey,
-	mint solana.PublicKey,
+	payer solanago.PrivateKey,
+	owner solanago.PublicKey,
+	mint solanago.PublicKey,
 	wsURL string,
-) (solana.PublicKey, error) {
+) (solanago.PublicKey, error) {
 	payerPubkey := payer.PublicKey()
 
-	ata, _, err := solana.FindAssociatedTokenAddress(owner, mint)
+	ata, _, err := solanago.FindAssociatedTokenAddress(owner, mint)
 	if err != nil {
-		return solana.PublicKey{}, fmt.Errorf("find ATA address: %w", err)
+		return solanago.PublicKey{}, fmt.Errorf("find ATA address: %w", err)
 	}
 
-	// Check if ATA already exists
 	acctInfo, err := rpcClient.GetAccountInfo(ctx, ata)
 	if err == nil && acctInfo != nil && acctInfo.Value != nil {
-		return ata, nil // already exists
+		return ata, nil
 	}
 
 	createATAIx := associatedtokenaccount.NewCreateInstruction(
@@ -151,37 +145,37 @@ func CreateATA(
 
 	recent, err := rpcClient.GetLatestBlockhash(ctx, rpc.CommitmentFinalized)
 	if err != nil {
-		return solana.PublicKey{}, fmt.Errorf("get blockhash: %w", err)
+		return solanago.PublicKey{}, fmt.Errorf("get blockhash: %w", err)
 	}
 
-	tx, err := solana.NewTransaction(
-		[]solana.Instruction{createATAIx},
+	tx, err := solanago.NewTransaction(
+		[]solanago.Instruction{createATAIx},
 		recent.Value.Blockhash,
-		solana.TransactionPayer(payerPubkey),
+		solanago.TransactionPayer(payerPubkey),
 	)
 	if err != nil {
-		return solana.PublicKey{}, fmt.Errorf("create transaction: %w", err)
+		return solanago.PublicKey{}, fmt.Errorf("create transaction: %w", err)
 	}
 
-	_, err = tx.Sign(func(key solana.PublicKey) *solana.PrivateKey {
+	_, err = tx.Sign(func(key solanago.PublicKey) *solanago.PrivateKey {
 		if key.Equals(payerPubkey) {
 			return &payer
 		}
 		return nil
 	})
 	if err != nil {
-		return solana.PublicKey{}, fmt.Errorf("sign transaction: %w", err)
+		return solanago.PublicKey{}, fmt.Errorf("sign transaction: %w", err)
 	}
 
 	wsClient, err := ws.Connect(ctx, wsURL)
 	if err != nil {
-		return solana.PublicKey{}, fmt.Errorf("connect websocket: %w", err)
+		return solanago.PublicKey{}, fmt.Errorf("connect websocket: %w", err)
 	}
 	defer wsClient.Close()
 
 	_, err = confirm.SendAndConfirmTransaction(ctx, rpcClient, wsClient, tx)
 	if err != nil {
-		return solana.PublicKey{}, fmt.Errorf("send create ATA: %w", err)
+		return solanago.PublicKey{}, fmt.Errorf("send create ATA: %w", err)
 	}
 
 	return ata, nil
@@ -191,9 +185,9 @@ func CreateATA(
 func MintTestTokens(
 	ctx context.Context,
 	rpcClient *rpc.Client,
-	mintAuthority solana.PrivateKey,
-	mint solana.PublicKey,
-	destination solana.PublicKey,
+	mintAuthority solanago.PrivateKey,
+	mint solanago.PublicKey,
+	destination solanago.PublicKey,
 	amount uint64,
 	wsURL string,
 ) error {
@@ -204,7 +198,7 @@ func MintTestTokens(
 		mint,
 		destination,
 		authorityPubkey,
-		[]solana.PublicKey{},
+		[]solanago.PublicKey{},
 	).Build()
 
 	recent, err := rpcClient.GetLatestBlockhash(ctx, rpc.CommitmentFinalized)
@@ -212,16 +206,16 @@ func MintTestTokens(
 		return fmt.Errorf("get blockhash: %w", err)
 	}
 
-	tx, err := solana.NewTransaction(
-		[]solana.Instruction{mintToIx},
+	tx, err := solanago.NewTransaction(
+		[]solanago.Instruction{mintToIx},
 		recent.Value.Blockhash,
-		solana.TransactionPayer(authorityPubkey),
+		solanago.TransactionPayer(authorityPubkey),
 	)
 	if err != nil {
 		return fmt.Errorf("create transaction: %w", err)
 	}
 
-	_, err = tx.Sign(func(key solana.PublicKey) *solana.PrivateKey {
+	_, err = tx.Sign(func(key solanago.PublicKey) *solanago.PrivateKey {
 		if key.Equals(authorityPubkey) {
 			return &mintAuthority
 		}
@@ -246,7 +240,7 @@ func MintTestTokens(
 }
 
 // GetSOLBalance returns the SOL balance of an account in lamports.
-func GetSOLBalance(ctx context.Context, rpcClient *rpc.Client, pubkey solana.PublicKey) (uint64, error) {
+func GetSOLBalance(ctx context.Context, rpcClient *rpc.Client, pubkey solanago.PublicKey) (uint64, error) {
 	balance, err := rpcClient.GetBalance(ctx, pubkey, rpc.CommitmentFinalized)
 	if err != nil {
 		return 0, fmt.Errorf("get balance: %w", err)
@@ -258,8 +252,8 @@ func GetSOLBalance(ctx context.Context, rpcClient *rpc.Client, pubkey solana.Pub
 func TransferSOL(
 	ctx context.Context,
 	rpcClient *rpc.Client,
-	from solana.PrivateKey,
-	to solana.PublicKey,
+	from solanago.PrivateKey,
+	to solanago.PublicKey,
 	lamports uint64,
 	wsURL string,
 ) error {
@@ -276,16 +270,16 @@ func TransferSOL(
 		return fmt.Errorf("get blockhash: %w", err)
 	}
 
-	tx, err := solana.NewTransaction(
-		[]solana.Instruction{transferIx},
+	tx, err := solanago.NewTransaction(
+		[]solanago.Instruction{transferIx},
 		recent.Value.Blockhash,
-		solana.TransactionPayer(fromPubkey),
+		solanago.TransactionPayer(fromPubkey),
 	)
 	if err != nil {
 		return fmt.Errorf("create transaction: %w", err)
 	}
 
-	_, err = tx.Sign(func(key solana.PublicKey) *solana.PrivateKey {
+	_, err = tx.Sign(func(key solanago.PublicKey) *solanago.PrivateKey {
 		if key.Equals(fromPubkey) {
 			return &from
 		}
